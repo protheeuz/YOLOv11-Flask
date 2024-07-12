@@ -1,0 +1,6 @@
+Flask
+opencv-python
+mysql-connector-python
+face_recognition
+dlib
+qrcode
