@@ -15,7 +15,7 @@ from config import Config
 from database import close_db
 from views.auth import auth_bp
 from views.main import main_bp
-from models import User  # Pastikan model User diimpor
+from models import User
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -44,7 +44,7 @@ def teardown_db(exception):
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html')
+    return render_template('home/index.html')
 
 if __name__ == '__main__':
     # Jalankan aplikasi dengan mode debug
