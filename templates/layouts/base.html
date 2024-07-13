@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>
+        Prima Feedmill - {% block title %}{% endblock %} | Monitoring Kesehatan Karyawan
+    </title>
+    <!-- Meta -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0, minimal-ui">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="description" content="Free Datta Able Admin Template come up with latest Bootstrap 4 framework with basic components, form elements and lots of pre-made layout options"/>
+    <meta name="keywords" content="admin templates, bootstrap admin templates, bootstrap 4, dashboard, dashboard templets, sass admin templets, html admin templates, responsive, bootstrap admin templates free download, premium bootstrap admin templates, datta able, datta able bootstrap admin template, free admin theme, free dashboard template"/>
+    <meta name="author" content="CodedThemes"/>
+
+    <!-- Favicon icon -->
+    <link rel="icon" href="{{ url_for('static', filename='assets/images/favicon.ico') }}" type="image/x-icon">
+    <!-- fontawesome icon -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/fonts/fontawesome/css/fontawesome-all.min.css') }}">
+    <!-- feather icon -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/fonts/feather/css/feather.css') }}">
+    <!-- animation css -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/plugins/animation/css/animate.min.css') }}">
+    <!-- vendor css -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/style.css') }}">
+    <!-- dark mode css -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/dark.css') }}">
+
+    <!-- Specific CSS goes HERE -->
+    {% block stylesheets %}{% endblock stylesheets %}
+
+</head>
+<body class="dark">
+    <!-- [ Pre-loader ] start -->
+    <div class="loader-bg">
+        <div class="loader-track">
+            <div class="loader-fill"></div>
+        </div>
+    </div>
+    <!-- [ Pre-loader ] End -->
+
+    {% include 'includes/sidebar.html' %}
+    {% include 'includes/navigation.html' %}
+
+    {% block content %}{% endblock content %}
+
+    {% include 'includes/scripts.html' %}
+
+    <!-- Specific Page JS goes HERE  -->
+    {% block javascripts %}{% endblock javascripts %}
+
+    <script>
+        document.getElementById('theme-switch').addEventListener('change', function (event) {
+            if (event.target.checked) {
+                document.body.classList.add('dark-mode');
+                document.getElementById('theme-indicator').classList.remove('icon-sun');
+                document.getElementById('theme-indicator').classList.add('icon-moon');
+            } else {
+                document.body.classList.remove('dark-mode');
+                document.getElementById('theme-indicator').classList.remove('icon-moon');
+                document.getElementById('theme-indicator').classList.add('icon-sun');
+            }
+        });
+
+        // Aktifkan tema gelap secara default
+        document.addEventListener('DOMContentLoaded', (event) => {
+            document.body.classList.add('dark-mode');
+            document.getElementById('theme-switch').checked = true;
+            document.getElementById('theme-indicator').classList.remove('icon-sun');
+            document.getElementById('theme-indicator').classList.add('icon-moon');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+{% extends "layouts/base-fullscreen.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block stylesheets %}
+<style>
+    .auth-content .card {
+        width: 500px; /* Mengubah lebar card sesuai kebutuhan */
+        margin: auto;
+    }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<div class="auth-wrapper">
+    <div class="auth-content">
+        <div class="auth-bg">
+            <span class="r"></span>
+            <span class="r s"></span>
+            <span class="r s"></span>
+            <span class="r"></span>
+        </div>
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="mb-4">
+                    <i class="feather icon-unlock auth-icon"></i>
+                </div>
+                <h3 class="mb-4">Login</h3>
+                <form id="loginForm" action="{{ url_for('auth.login') }}" method="POST">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="nik" name="nik" placeholder="NIK" required>
+                    </div>
+                    <div class="input-group mb-4">
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Kata Sandi" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary shadow-2 mb-4">Login</button>
+                </form>
+                <hr>
+                <div class="text-center">
+                    <button id="faceLoginBtn" class="btn btn-secondary btn-block">Login dengan Wajah</button>
+                    <button id="qrLoginBtn" class="btn btn-secondary btn-block">Login dengan QR Code</button>
+                </div>
+                <hr>
+                <div class="text-center">
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-link">Daftar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block javascripts %}
+<script>
+    document.getElementById('faceLoginBtn').addEventListener('click', function() {
+        fetch('{{ url_for("auth.login_face") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'sukses') {
+                if (data.user_id) {
+                    window.location.href = '{{ url_for("main.dashboard", user_id=0) }}'.replace('0', data.user_id);
+                } else {
+                    alert('User ID tidak ditemukan.');
+                }
+            } else {
+                alert('Login wajah gagal: ' + data.pesan);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+    });
+
+    document.getElementById('qrLoginBtn').addEventListener('click', function() {
+        let qr_code = prompt('Masukkan QR Code Anda:');
+        if (qr_code) {
+            fetch('{{ url_for("auth.login_qr") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ qr_code: qr_code })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'sukses') {
+                    if (data.user_id) {
+                        window.location.href = '{{ url_for("main.dashboard", user_id=0) }}'.replace('0', data.user_id);
+                    } else {
+                        alert('User ID tidak ditemukan.');
+                    }
+                } else {
+                    alert('Login QR Code gagal: ' + data.pesan);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    });
+
+    // Aktifkan tema gelap secara default
+    document.addEventListener('DOMContentLoaded', (event) => {
+        document.body.classList.add('dark');
+    });
+</script>
+{% endblock javascripts %}
