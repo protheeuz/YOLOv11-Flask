@@ -1,5 +1,6 @@
 import os
 import warnings
+from dotenv import load_dotenv
 
 # Menonaktifkan operasi khusus oneDNN untuk TensorFlow
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
@@ -16,6 +17,9 @@ from database import close_db
 from views.auth import auth_bp
 from views.main import main_bp
 from models import User
+
+# Load variabel lingkungan dari file .env
+load_dotenv()
 
 app = Flask(__name__)
 app.config.from_object(Config)

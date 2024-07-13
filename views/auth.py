@@ -1,10 +1,15 @@
 import cv2
 import numpy as np
-from flask import Blueprint, request, jsonify, redirect, url_for, render_template, send_file, flash
+from flask import Blueprint, request, jsonify, redirect, url_for, render_template, send_file, flash, current_app
 from flask_login import login_user, logout_user, login_required
+from sklearn.metrics.pairwise import cosine_similarity
 from database import get_db
 from deepface import DeepFace
 from datetime import datetime
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+import os
 import json
 import bcrypt
 import qrcode
@@ -13,7 +18,6 @@ from models import User
 import random
 import string
 import logging
-from sklearn.metrics.pairwise import cosine_similarity
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -32,6 +36,83 @@ def calculate_cosine_similarity(embedding1, embedding2):
     embedding1 = np.array(embedding1).reshape(1, -1)
     embedding2 = np.array(embedding2).reshape(1, -1)
     return cosine_similarity(embedding1, embedding2)[0][0]
+
+# Fungsi untuk menghasilkan token reset password
+def generate_reset_token(user_id):
+    s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+    return s.dumps(user_id, salt='password-reset-salt')
+
+# Fungsi untuk memverifikasi token reset password
+def verify_reset_token(token, expiration=3600):
+    s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+    try:
+        user_id = s.loads(token, salt='password-reset-salt', max_age=expiration)
+    except (SignatureExpired, BadSignature):
+        return None
+    return user_id
+
+# Fungsi untuk mengirim email reset password
+def send_reset_password_email(email, reset_link, name):
+    html_content = render_template('email_templates/reset_password_email.html', reset_link=reset_link, name=name)
+    message = Mail(
+        from_email=current_app.config['SENDGRID_DEFAULT_FROM'],
+        to_emails=email,
+        subject='Reset Password Kamu',
+        html_content=html_content
+    )
+    try:
+        sg = SendGridAPIClient(current_app.config['SENDGRID_API_KEY'])
+        response = sg.send(message)
+        logging.info(f"Email sent to {email} with status code {response.status_code}")
+    except Exception as e:
+        logging.error(f"Error sending email: {e}")
+
+@auth_bp.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        nik = request.form['nik']
+        
+        connection = get_db()
+        cursor = connection.cursor()
+        
+        cursor.execute("SELECT id, email, name FROM users WHERE nik=%s", (nik,))
+        user = cursor.fetchone()
+        cursor.close()
+        
+        if user:
+            user_id, email, name = user
+            reset_token = generate_reset_token(user_id)
+            reset_link = url_for('auth.reset_password', token=reset_token, _external=True)
+            send_reset_password_email(email, reset_link, name)
+            return render_template('auth/forgot_password.html', success='Link reset password telah dikirim ke email Anda.')
+        else:
+            return render_template('auth/forgot_password.html', error='NIK yang dimasukkan memang belum tersedia.')
+    
+    return render_template('auth/forgot_password.html')
+
+@auth_bp.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    user_id = verify_reset_token(token)
+    if not user_id:
+        return render_template('auth/reset_password.html', error='Token reset password tidak valid atau telah kadaluarsa.')
+
+    if request.method == 'POST':
+        password = request.form['password']
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+        connection = get_db()
+        cursor = connection.cursor()
+        cursor.execute("UPDATE users SET password=%s WHERE id=%s", (hashed_password, user_id))
+        connection.commit()
+        cursor.close()
+
+        return redirect(url_for('auth.login'))
+    
+    return render_template('auth/reset_password.html', token=token)
+
+##################################################################
+######## BATAS ROUTING UNTUK AUTHENTICATION ######################
+##################################################################
 
 @auth_bp.route('/check_existing_user', methods=['POST'])
 def check_existing_user():
@@ -265,7 +346,7 @@ def delete_user(user_id):
     except Exception as e:
         connection.rollback()
         cursor.close()
-        return jsonify({"status": "gagal", "pesan": str(e)}), 500
+        return jsonify({"status": "gagal", "pesan": str(e)}), 500 
 
 def recognize_face(face_encoding):
     connection = get_db()

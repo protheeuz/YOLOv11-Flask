@@ -5,16 +5,16 @@
 {% block stylesheets %}
 <style>
     .auth-content .card {
-        width: 500px; /* Mengubah lebar card sesuai kebutuhan */
+        width: 600px; 
         margin: auto;
     }
     #qr-code {
         display: block;
         margin: auto;
-        margin-top: 20px; /* Tambahkan jarak di atas QR code */
+        margin-top: 20px; 
     }
     #codeInput {
-        margin-top: 20px; /* Tambahkan jarak di atas form kode unik */
+        margin-top: 20px;
     }
     #face-login-modal {
         display: none; 
@@ -121,6 +121,9 @@
                     </div>
                     <div class="input-group mb-4">
                         <input type="password" class="form-control" id="password" name="password" placeholder="Kata Sandi" required>
+                    </div>
+                    <div class="d-flex justify-content-end mb-4">
+                        <a href="{{ url_for('auth.forgot_password') }}" class="btn btn-link p-0">Lupa Password?</a>
                     </div>
                     <button type="submit" class="btn btn-primary shadow-2 mb-4">Login</button>
                 </form>
