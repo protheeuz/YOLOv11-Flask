@@ -4,9 +4,14 @@
 
 {% block stylesheets %}
 <style>
+    .auth-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+    }
     .auth-content .card {
-        width: 600px; 
-        margin: auto;
+        width: 550px;
     }
     #qr-code {
         display: block;
@@ -218,7 +223,12 @@
         document.getElementById('error-message').style.display = 'none';
         
         fetch('{{ url_for("auth.generate_qr") }}?nik=' + nik)
-        .then(response => response.blob())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('NIK tidak ditemukan');
+            }
+            return response.blob();
+        })
         .then(blob => {
             const url = URL.createObjectURL(blob);
             const qrCodeImg = document.getElementById('qr-code');
@@ -227,6 +237,8 @@
             document.getElementById('codeInput').style.display = 'block';
         })
         .catch(error => {
+            document.getElementById('error-message').innerText = 'NIK memang belum tersedia pada sistem.';
+            document.getElementById('error-message').style.display = 'block';
             console.error('Error:', error);
         });
     });
