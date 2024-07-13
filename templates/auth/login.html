@@ -111,7 +111,9 @@
                 </div>
                 <h3 class="mb-4">Masuk</h3>
                 {% if msg %}
-                    <div class="alert alert-danger">{{ msg }}</div>
+                    <div class="alert alert-danger" id="error-message">{{ msg }}</div>
+                {% else %}
+                    <div class="alert alert-danger" id="error-message" style="display: none;"></div>
                 {% endif %}
                 <form id="loginForm" action="{{ url_for('auth.login') }}" method="POST">
                     <div class="input-group mb-3">
@@ -203,7 +205,16 @@
     });
 
     document.getElementById('qrLoginBtn').addEventListener('click', function() {
-        fetch('{{ url_for("auth.generate_qr") }}?nik=' + document.getElementById('nik').value)
+        const nik = document.getElementById('nik').value;
+        if (!nik) {
+            document.getElementById('error-message').innerText = 'Silakan masukkan NIK terlebih dahulu.';
+            document.getElementById('error-message').style.display = 'block';
+            return;
+        }
+
+        document.getElementById('error-message').style.display = 'none';
+        
+        fetch('{{ url_for("auth.generate_qr") }}?nik=' + nik)
         .then(response => response.blob())
         .then(blob => {
             const url = URL.createObjectURL(blob);
