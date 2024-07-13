@@ -145,8 +145,8 @@
 <script>
     document.getElementById('startFaceRegistration').addEventListener('click', function() {
         const formData = new FormData(document.getElementById('registerForm'));
+        formData.append('role', 'karyawan');  // Set default role as karyawan
         
-        // Cek apakah NIK atau email sudah terdaftar
         fetch('{{ url_for("auth.check_existing_user") }}', {
             method: 'POST',
             body: formData
@@ -158,10 +158,8 @@
             } else {
                 document.getElementById('error-message').innerText = '';
                 document.getElementById('face-register-modal').style.display = 'flex';
-                // Simpan data form sementara di localStorage
                 window.localStorage.setItem('registerFormData', JSON.stringify(Object.fromEntries(formData)));
                 
-                // Mengambil video dari kamera
                 const video = document.getElementById('video');
                 if (navigator.mediaDevices.getUserMedia) {
                     navigator.mediaDevices.getUserMedia({ video: true })
@@ -179,7 +177,6 @@
         });
     });
 
-    // Capture wajah
     document.getElementById('capture').addEventListener('click', function() {
         const canvas = document.createElement('canvas');
         const video = document.getElementById('video');
@@ -221,7 +218,6 @@
         }, 'image/png');
     });
 
-    // Tutup modal
     document.getElementById('close-modal').addEventListener('click', function() {
         document.getElementById('face-register-modal').style.display = 'none';
     });

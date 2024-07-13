@@ -23,7 +23,7 @@ def generate_unique_code():
 logging.basicConfig(level=logging.DEBUG)
 
 def encode_face(face_encoding):
-    return json.dumps(face_encoding.tolist())
+    return json.dumps(face_encoding)
 
 def decode_face(stored_encoding):
     return np.array(json.loads(stored_encoding))
@@ -57,7 +57,7 @@ def register():
         name = request.form['name']
         email = request.form['email']
         password = request.form['password']
-        role = 'karyawan'
+        role = request.form['role']
         registration_date = datetime.now()
         unique_code = generate_unique_code()
 
@@ -87,7 +87,7 @@ def register_face():
     name = request.form['name']
     email = request.form['email']
     password = request.form['password']
-    role = 'karyawan'
+    role = request.form['role']
     registration_date = datetime.now()
     unique_code = generate_unique_code()
     
@@ -96,12 +96,15 @@ def register_face():
     img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
 
     try:
-        result = DeepFace.represent(img, model_name='Facenet')
+        result = DeepFace.represent(img, model_name='Facenet', enforce_detection=False)
         face_encoding = result[0]["embedding"]
+
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
         connection = get_db()
         cursor = connection.cursor()
         cursor.execute("INSERT INTO users (nik, name, email, password, registration_date, role, unique_code) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                       (nik, name, email, password, registration_date, role, unique_code))
+                       (nik, name, email, hashed_password, registration_date, role, unique_code))
         connection.commit()
         user_id = cursor.lastrowid
         cursor.execute("INSERT INTO faces (user_id, encoding) VALUES (%s, %s)", (user_id, encode_face(face_encoding)))
@@ -109,6 +112,7 @@ def register_face():
         cursor.close()
         return jsonify({"status": "sukses", "user_id": user_id})
     except Exception as e:
+        logging.exception("Terjadi kesalahan saat memproses wajah")
         return jsonify({"status": "gagal", "pesan": "Wajah tidak ditemukan"}), 400
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
@@ -120,13 +124,16 @@ def login():
         cursor = connection.cursor()
         cursor.execute("SELECT id, password, role FROM users WHERE nik=%s", (nik,))
         user_data = cursor.fetchone()
-        cursor.close()
 
         if user_data and bcrypt.checkpw(password.encode('utf-8'), user_data[1].encode('utf-8')):
             user = User.get(user_data[0])
             login_user(user)
+            cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_data[0],))
+            connection.commit()
+            cursor.close()
             return redirect(url_for('main.index'))
 
+        cursor.close()
         return render_template('auth/login.html', msg='NIK atau password salah')
 
     return render_template('auth/login.html')
@@ -242,6 +249,24 @@ def login_qr():
         cursor.close()
         return jsonify({"status": "gagal", "pesan": "QR Code tidak valid"}), 401
 
+@auth_bp.route('/delete_user/<int:user_id>', methods=['POST'])
+@login_required
+def delete_user(user_id):
+    connection = get_db()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("DELETE FROM faces WHERE user_id=%s", (user_id,))
+        cursor.execute("DELETE FROM users WHERE id=%s", (user_id,))
+        connection.commit()
+        cursor.close()
+        
+        return jsonify({"status": "sukses", "pesan": "User berhasil dihapus"})
+    except Exception as e:
+        connection.rollback()
+        cursor.close()
+        return jsonify({"status": "gagal", "pesan": str(e)}), 500
+
 def recognize_face(face_encoding):
     connection = get_db()
     cursor = connection.cursor()
@@ -253,6 +278,6 @@ def recognize_face(face_encoding):
         user_id, stored_encoding = row
         stored_encoding = decode_face(stored_encoding)
         similarity = calculate_cosine_similarity(face_encoding, stored_encoding)
-        if similarity > 0.8:  # Ambang batas kesamaan (0.8 dapat disesuaikan)
+        if similarity > 0.8:
             return user_id
     return None
