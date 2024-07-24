@@ -164,6 +164,48 @@
         </div>
     </div>
 </div>
+
+<!-- Modal untuk pengecekan kesehatan -->
+<div class="modal fade" id="healthCheckModal" tabindex="-1" role="dialog" aria-labelledby="healthCheckModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="healthCheckModalLabel">Pengecekan Kesehatan</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>PENGECEKAN KESEHATAN</p>
+                <div id="health-check-step-1">
+                    <p>DETAK JANTUNG:</p>
+                    <button type="button" class="btn btn-primary" id="startHeartRateCheck">Cek sekarang</button>
+                    <div id="heartRateValue"></div>
+                </div>
+                <div id="health-check-step-2" style="display: none;">
+                    <p>LEVEL OKSIGEN:</p>
+                    <button type="button" class="btn btn-primary" id="startOxygenLevelCheck">Cek sekarang</button>
+                    <div id="oxygenLevelValue"></div>
+                </div>
+                <div id="health-check-step-3" style="display: none;">
+                    <p>TEMPERATUR:</p>
+                    <button type="button" class="btn btn-primary" id="startTemperatureCheck">Cek sekarang</button>
+                    <div id="temperatureValue"></div>
+                </div>
+                <div id="health-check-step-4" style="display: none;">
+                    <p>LEVEL AKTIVITAS:</p>
+                    <button type="button" class="btn btn-primary" id="startActivityLevelCheck">Cek sekarang</button>
+                    <div id="activityLevelValue"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="submitHealthCheck" style="display: none;">Submit</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock content %}
 
 {% block javascripts %}
@@ -275,6 +317,107 @@
     // Aktifkan tema gelap secara default
     document.addEventListener('DOMContentLoaded', (event) => {
         document.body.classList.add('dark');
+    });
+
+    // Tambahkan logika modal pengecekan kesehatan
+    function checkHealthStatus() {
+        fetch('{{ url_for("main.health_check") }}')
+        .then(response => response.json())
+        .then(data => {
+            if (!data.health_check_completed) {
+                $('#healthCheckModal').modal('show');
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        const formData = new FormData(this);
+        fetch(this.action, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'sukses') {
+                checkHealthStatus();
+            } else {
+                document.getElementById('error-message').innerText = data.message;
+                document.getElementById('error-message').style.display = 'block';
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    });
+
+    document.getElementById('startHeartRateCheck').addEventListener('click', function() {
+        fetch('{{ url_for("main.get_sensor_data") }}')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('heartRateValue').innerText = 'Detak Jantung: ' + data.heart_rate;
+            document.getElementById('health-check-step-1').style.display = 'none';
+            document.getElementById('health-check-step-2').style.display = 'block';
+        })
+        .catch(error => console.error('Error:', error));
+    });
+
+    document.getElementById('startOxygenLevelCheck').addEventListener('click', function() {
+        fetch('{{ url_for("main.get_sensor_data") }}')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('oxygenLevelValue').innerText = 'Level Oksigen: ' + data.oxygen_level;
+            document.getElementById('health-check-step-2').style.display = 'none';
+            document.getElementById('health-check-step-3').style.display = 'block';
+        })
+        .catch(error => console.error('Error:', error));
+    });
+
+    document.getElementById('startTemperatureCheck').addEventListener('click', function() {
+        fetch('{{ url_for("main.get_sensor_data") }}')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('temperatureValue').innerText = 'Temperatur: ' + data.temperature;
+            document.getElementById('health-check-step-3').style.display = 'none';
+            document.getElementById('health-check-step-4').style.display = 'block';
+        })
+        .catch(error => console.error('Error:', error));
+    });
+
+    document.getElementById('startActivityLevelCheck').addEventListener('click', function() {
+        fetch('{{ url_for("main.get_sensor_data") }}')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('activityLevelValue').innerText = 'Level Aktivitas: ' + data.activity_level;
+            document.getElementById('health-check-step-4').style.display = 'none';
+            document.getElementById('submitHealthCheck').style.display = 'block';
+        })
+        .catch(error => console.error('Error:', error));
+    });
+
+    document.getElementById('submitHealthCheck').addEventListener('click', function() {
+        const formData = {
+            heart_rate: document.getElementById('heartRateValue').innerText.split(': ')[1],
+            oxygen_level: document.getElementById('oxygenLevelValue').innerText.split(': ')[1],
+            temperature: document.getElementById('temperatureValue').innerText.split(': ')[1],
+            activity_level: document.getElementById('activityLevelValue').innerText.split(': ')[1]
+        };
+        fetch('{{ url_for("main.sensor_data") }}', {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'sukses') {
+                $('#healthCheckModal').modal('hide');
+                window.location.href = "{{ url_for('main.index') }}";
+            } else {
+                alert('Gagal menyimpan data kesehatan');
+            }
+        })
+        .catch(error => console.error('Error:', error));
     });
 </script>
 {% endblock javascripts %}

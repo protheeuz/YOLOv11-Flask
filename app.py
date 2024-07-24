@@ -28,6 +28,9 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'auth.login'  # Tentukan endpoint login
 
+# Tambahkan konfigurasi 'UPLOAD_FOLDER'
+app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.get(user_id)
@@ -51,5 +54,4 @@ def index():
     return render_template('home/index.html')
 
 if __name__ == '__main__':
-    # Jalankan aplikasi dengan mode debug
-    app.run(debug=True)
+    app.run(host='0.0.0.0', debug=True)

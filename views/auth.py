@@ -37,12 +37,10 @@ def calculate_cosine_similarity(embedding1, embedding2):
     embedding2 = np.array(embedding2).reshape(1, -1)
     return cosine_similarity(embedding1, embedding2)[0][0]
 
-# Fungsi untuk menghasilkan token reset password
 def generate_reset_token(user_id):
     s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
     return s.dumps(user_id, salt='password-reset-salt')
 
-# Fungsi untuk memverifikasi token reset password
 def verify_reset_token(token, expiration=3600):
     s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
     try:
@@ -51,7 +49,6 @@ def verify_reset_token(token, expiration=3600):
         return None
     return user_id
 
-# Fungsi untuk mengirim email reset password
 def send_reset_password_email(email, reset_link, name):
     html_content = render_template('email_templates/reset_password_email.html', reset_link=reset_link, name=name)
     message = Mail(
@@ -66,6 +63,10 @@ def send_reset_password_email(email, reset_link, name):
         logging.info(f"Email sent to {email} with status code {response.status_code}")
     except Exception as e:
         logging.error(f"Error sending email: {e}")
+
+############################################################
+############### BATAS ROUTES AUTHENTICATION ################
+############################################################
 
 @auth_bp.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
@@ -110,10 +111,6 @@ def reset_password(token):
     
     return render_template('auth/reset_password.html', token=token)
 
-##################################################################
-######## BATAS ROUTING UNTUK AUTHENTICATION ######################
-##################################################################
-
 @auth_bp.route('/check_existing_user', methods=['POST'])
 def check_existing_user():
     nik = request.form['nik']
@@ -138,7 +135,7 @@ def register():
         name = request.form['name']
         email = request.form['email']
         password = request.form['password']
-        role = request.form['role']
+        role = 'karyawan'  
         registration_date = datetime.now()
         unique_code = generate_unique_code()
 
@@ -168,7 +165,7 @@ def register_face():
     name = request.form['name']
     email = request.form['email']
     password = request.form['password']
-    role = request.form['role']
+    role = 'karyawan'  
     registration_date = datetime.now()
     unique_code = generate_unique_code()
     
@@ -211,13 +208,22 @@ def login():
             login_user(user)
             cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_data[0],))
             connection.commit()
+
+            check_date = datetime.now().date()
+            cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_data[0], check_date))
+            health_check = cursor.fetchone()
             cursor.close()
+
+            if not health_check or not health_check[0]:
+                return redirect(url_for('main.health_check_modal'))
+            
             return redirect(url_for('main.index'))
 
         cursor.close()
         return render_template('auth/login.html', msg='NIK atau password salah')
 
     return render_template('auth/login.html')
+
 
 @auth_bp.route('/logout')
 @login_required
@@ -240,6 +246,15 @@ def login_face():
     if not ret:
         logging.error("Tidak dapat mengambil frame dari kamera")
         return jsonify({"status": "gagal", "pesan": "Tidak dapat mengambil frame dari kamera"}), 400
+
+    # Tambahkan langkah deteksi wajah sebelum ekstraksi fitur
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+
+    if len(faces) == 0:
+        logging.error("Tidak ada wajah yang terdeteksi")
+        return jsonify({"status": "gagal", "pesan": "Tidak ada wajah yang terdeteksi"}), 400
 
     try:
         logging.debug("Mengambil representasi wajah")
@@ -359,6 +374,6 @@ def recognize_face(face_encoding):
         user_id, stored_encoding = row
         stored_encoding = decode_face(stored_encoding)
         similarity = calculate_cosine_similarity(face_encoding, stored_encoding)
-        if similarity > 0.8:
+        if similarity > 0.9:  
             return user_id
     return None

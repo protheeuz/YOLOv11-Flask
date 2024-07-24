@@ -53,7 +53,7 @@
                             <li class="n-title"><p class="m-b-0">BARU</p></li>
                             <li class="notification">
                                 <div class="media">
-                                    <img class="img-radius" src="{{ config.ASSETS_ROOT }}/images/user/avatar-1.jpg" alt="Generic placeholder image">
+                                    <img class="img-radius" src="{{ url_for('static', filename='assets/images/user/avatar-1.jpg') }}" alt="Generic placeholder image">
                                     <div class="media-body">
                                         <p><strong>John Doe</strong><span class="n-time text-muted"><i class="icon feather icon-clock m-r-10"></i>30 min</span></p>
                                         <p>Tiket baru ditambahkan</p>
@@ -63,7 +63,7 @@
                             <li class="n-title"><p class="m-b-0">SEBELUMNYA</p></li>
                             <li class="notification">
                                 <div class="media">
-                                    <img class="img-radius" src="{{ config.ASSETS_ROOT }}/images/user/avatar-2.jpg" alt="Generic placeholder image">
+                                    <img class="img-radius" src="{{ url_for('static', filename='assets/images/user/avatar-2.jpg') }}" alt="Generic placeholder image">
                                     <div class="media-body">
                                         <p><strong>Joseph William</strong><span class="n-time text-muted"><i class="icon feather icon-clock m-r-10"></i>30 min</span></p>
                                         <p>Pembelian Tema Baru dan pembayaran</p>
@@ -72,7 +72,7 @@
                             </li>
                             <li class="notification">
                                 <div class="media">
-                                    <img class="img-radius" src="{{ config.ASSETS_ROOT }}/images/user/avatar-3.jpg" alt="Generic placeholder image">
+                                    <img class="img-radius" src="{{ url_for('static', filename='assets/images/user/avatar-3.jpg') }}" alt="Generic placeholder image">
                                     <div class="media-body">
                                         <p><strong>Sara Soudein</strong><span class="n-time text-muted"><i class="icon feather icon-clock m-r-10"></i>30 min</span></p>
                                         <p>Sedang login</p>
@@ -91,14 +91,21 @@
                     </a>
                     <div class="dropdown-menu dropdown-menu-right profile-notification">
                         <div class="pro-head">
-                            <img src="{{ config.ASSETS_ROOT }}/images/user/avatar-1.jpg" class="img-radius" alt="User-Profile-Image">
-                            <span>{% if current_user.is_authenticated %}{{ current_user.username }}{% else %}Pengguna{% endif %}</span>
+                            <img src="{{ url_for('static', filename='assets/images/user/avatar-1.jpg') }}" class="img-radius" alt="User-Profile-Image">
+                            <span class="user-info">
+                                {% if current_user.is_authenticated %}
+                                    {{ current_user.name }} <br> 
+                                    {{ current_user.role }}
+                                {% else %}
+                                    Pengguna
+                                {% endif %}
+                            </span>
                             <a href="{{ url_for('auth.logout') }}" class="dud-logout" title="Logout">
                                 <i class="feather icon-log-out"></i>
                             </a>
                         </div>
                         <ul class="pro-body">
-                            <li><a href="/profile.html" class="dropdown-item"><i class="feather icon-user"></i> Profil</a></li>
+                            <li><a href="{{ url_for('main.profile') }}" class="dropdown-item"><i class="feather icon-user"></i> Profil</a></li>
                             <li><a href="{{ url_for('auth.logout') }}" class="dropdown-item"><i class="feather icon-lock"></i> Keluar</a></li>
                         </ul>
                     </div>
@@ -108,3 +115,11 @@
     </div>
 </header>
 <!-- [ Header ] end -->
+
+<style>
+    .pro-head .user-info {
+        display: inline-block;
+        vertical-align: middle;
+        margin-left: 10px;
+    }
+</style>

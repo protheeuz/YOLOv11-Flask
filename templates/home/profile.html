@@ -1,0 +1,163 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Profil {% endblock %} 
+
+<!-- Specific CSS goes HERE -->
+{% block stylesheets %}
+<style>
+    .profile-image-container {
+        position: relative;
+        cursor: pointer;
+    }
+
+    .profile-image-container input[type="file"] {
+        display: none;
+    }
+
+    .profile-image-container img {
+        transition: opacity 0.3s ease;
+    }
+
+    .profile-image-container:hover img {
+        opacity: 0.7;
+    }
+
+    .profile-image-container:hover::after {
+        content: 'Edit';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(0, 0, 0, 0.5);
+        color: white;
+        padding: 5px;
+        border-radius: 5px;
+    }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<!-- [ Main Content ] start -->
+<div class="pcoded-main-container">
+    <div class="pcoded-wrapper">
+        <div class="pcoded-content">
+            <div class="pcoded-inner-content">
+                <div class="main-body">
+                    <div class="page-wrapper">
+                        <!-- [ Main Content ] start -->
+                        <div class="row">
+                            <div class="col-sm-8">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5>Edit Info</h5>
+                                    </div>
+                                    <div class="card-block">
+                                        <form action="{{ url_for('main.update_profile') }}" method="post">
+                                            <div class="row">
+                                                <div class="col-sm-6 mb-4">
+                                                    <div class="form-group">
+                                                        <label for="exampleInputNIK">NIK</label>
+                                                        <input class="form-control" id="exampleInputNIK" name="nik" readonly 
+                                                               value="{{ current_user.nik }}"
+                                                               aria-describedby="nikHelp" placeholder="Masukkan NIK">
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-6 mb-4">
+                                                    <div class="form-group">
+                                                        <label {% if not current_user.email %} class="text-danger" {% endif %} 
+                                                               for="exampleInputEmail1">Alamat Email</label>
+                                                        <input type="email" name="email"
+                                                               {% if current_user.email %} readonly value="{{ current_user.email }}" {% endif %}  
+                                                               class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Masukkan email">
+                                                        {% if not current_user.email %}       
+                                                            <small id="emailHelp" class="form-text text-danger">
+                                                                Anda tidak memiliki alamat email yang terkait dengan akun ini.
+                                                            </small>
+                                                        {% endif %}    
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-12 mb-4">
+                                                    <div class="form-group">
+                                                        <label for="name">Nama Lengkap</label>
+                                                        <input type="text" name="name" class="form-control" id="name" 
+                                                               value="{{ current_user.name }}" placeholder="Nama lengkap Anda">
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-12 mb-4">
+                                                    <div class="form-group">
+                                                        <label for="address">Alamat</label>
+                                                        <input type="text" name="address" class="form-control" id="address" 
+                                                               value="{{ current_user.address }}" placeholder="Alamat lengkap di sini">
+                                                        <small id="addressHelp" class="form-text text-muted">Ini adalah alamat Kamu</small>
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-12 mb-4">
+                                                    <div class="form-group">
+                                                        <label for="about">Tentang Info</label>
+                                                        <textarea type="text" name="about" class="form-control" id="about" 
+                                                                  placeholder="Bio">{{ current_user.about }}</textarea>
+                                                        <small id="aboutHelp" class="form-text text-muted">Kami akan menampilkan ini di profil Anda.</small>
+                                                    </div>
+                                                </div>
+
+                                                <div class="col-sm-12 mb-2">
+                                                    <div class="form-group">
+                                                        <button type="submit" class="btn btn-primary">Perbarui</button>
+                                                    </div>
+                                                </div>                                                
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="card">
+                                    <div class="card-block">
+                                        <div class="d-flex align-items-center justify-content-center flex-column">
+                                            <div class="profile-image-container w-50 p-3">
+                                                <form action="{{ url_for('main.update_profile_image') }}" method="post" enctype="multipart/form-data" id="profileImageForm">
+                                                    <label for="profile_image">
+                                                        <img src="{{ url_for('static', filename=current_user.profile_image or 'assets/images/user/profile.jpg') }}" alt="profile image"
+                                                            class="img-fluid rounded-circle">
+                                                    </label>
+                                                    <input type="file" name="profile_image" id="profile_image" onchange="document.getElementById('profileImageForm').submit();">
+                                                </form>
+                                            </div>
+                                            <div class="text-center">
+                                                <h4 class="font-weight-bold h6">
+                                                    {{ current_user.name }}
+                                                </h4>
+                                                <p class="font-italic text-muted">
+                                                    {% if current_user.email %} {{ current_user.email }} {% endif %}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div class="small font-weight-light mt-4 text-center text-muted">
+                                            <p>
+                                                Halaman ini adalah ruang pribadi Kamu.
+                                                <br />
+                                            </p>
+                                        </div>
+                                        <div class="d-flex justify-content-center align-items-center">
+                                            <a href="https://sintafeed.com/ver3/?page_id=126" 
+                                               target="_blank" 
+                                               class="h6 text-muted d-block m-1"><i
+                                               class="icon feather icon-help-circle"></i></a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- [ Main Content ] end -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- [ Main Content ] end -->
+
+{% endblock content %}
+
+<!-- Specific Page JS goes HERE  -->
+{% block javascripts %}{% endblock javascripts %}
