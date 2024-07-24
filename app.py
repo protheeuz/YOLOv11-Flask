@@ -1,6 +1,7 @@
 import os
 import warnings
 from dotenv import load_dotenv
+from flask_cors import CORS
 
 # Menonaktifkan operasi khusus oneDNN untuk TensorFlow
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
@@ -10,9 +11,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Mengurangi log peringatan TensorFlow
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import tensorflow as tf
-from flask import Flask, render_template, redirect, url_for
+from flask import Flask, current_app, render_template, redirect, request, session, url_for
 from flask_login import LoginManager, current_user, login_required
-from flask_cors import CORS
 from config import Config
 from database import close_db
 from views.auth import auth_bp
@@ -37,6 +37,12 @@ app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
 @login_manager.user_loader
 def load_user(user_id):
     return User.get(user_id)
+
+@app.before_request
+def log_request_info():
+    current_app.logger.debug('Headers: %s', request.headers)
+    current_app.logger.debug('Body: %s', request.get_data())
+    current_app.logger.debug('Session: %s', session.items())
 
 @app.context_processor
 def inject_user():

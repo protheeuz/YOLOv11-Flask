@@ -70,6 +70,7 @@ def get_sensor_data(sensor):
     except Exception as e:
         return jsonify({'status': 'gagal', 'message': str(e)}), 500
 
+
 @main_bp.route('/sensor_data', methods=['POST'])
 def sensor_data():
     data = request.get_json()
@@ -83,7 +84,6 @@ def sensor_data():
     connection = get_db()
     cursor = connection.cursor()
     
-    # Logging untuk debugging
     current_app.logger.info(f"user_id: {user_id}, heart_rate: {heart_rate}, oxygen_level: {oxygen_level}, temperature: {temperature}, activity_level: {activity_level}, ecg_value: {ecg_value}")
     
     cursor.execute("""
@@ -102,12 +102,12 @@ def sensor_data():
 @main_bp.route('/poll_health_check_status', methods=['GET'])
 def poll_health_check_status():
     user_id = session.get('user_id')
-    current_app.logger.debug(f"Polling health check status, session user_id: {user_id}")
-    if user_id:
-        return jsonify({"user_id": user_id})
+    session_token = session.get('session_token')
+    current_app.logger.debug(f'Polling health check status, session user_id: {user_id}, session_token: {session_token}')
+    if user_id and session_token:
+        return jsonify({"user_id": user_id, "session_token": session_token})
     else:
-        return jsonify({"user_id": -1})
-
+        return jsonify({"user_id": -1, "session_token": None})
 
 @main_bp.route('/profile')
 @login_required

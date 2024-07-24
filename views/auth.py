@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from flask import Blueprint, request, jsonify, redirect, session, url_for, render_template, send_file, flash, current_app
 from flask_login import login_user, logout_user, login_required, current_user
+import requests
 from sklearn.metrics.pairwise import cosine_similarity
 from database import get_db
 from deepface import DeepFace
@@ -23,6 +24,9 @@ auth_bp = Blueprint('auth', __name__)
 
 def generate_unique_code():
     return ''.join(random.choices(string.digits, k=4))
+
+def generate_session_token():
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=32))
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -206,8 +210,9 @@ def login():
         if user_data and bcrypt.checkpw(password.encode('utf-8'), user_data[1].encode('utf-8')):
             user = User.get(user_data[0])
             login_user(user)
-            session['user_id'] = user_data[0]  # Simpan user_id dalam session
-            logging.debug(f'Session user_id set: {session.get("user_id")}')
+            session['user_id'] = user_data[0]
+            session['session_token'] = generate_session_token()
+            current_app.logger.debug(f'Session after login (username/password): {session.items()}')
             cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_data[0],))
             connection.commit()
 
@@ -226,13 +231,6 @@ def login():
 
     return render_template('auth/login.html')
 
-
-@auth_bp.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('auth.login'))
-
 @auth_bp.route('/login_face', methods=['POST'])
 def login_face():
     logging.debug("Memulai proses login wajah")
@@ -249,7 +247,6 @@ def login_face():
         logging.error("Tidak dapat mengambil frame dari kamera")
         return jsonify({"status": "gagal", "pesan": "Tidak dapat mengambil frame dari kamera"}), 400
 
-    # Tambahkan langkah deteksi wajah sebelum ekstraksi fitur
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.1, 4)
@@ -275,8 +272,9 @@ def login_face():
             user = User.get(user_id)
             login_user(user)
             
-            session['user_id'] = user_id  # Simpan user_id dalam session
-            logging.debug(f'Session user_id set: {session.get("user_id")}')
+            session['user_id'] = user_id
+            session['session_token'] = generate_session_token()
+            current_app.logger.debug(f'Session after login (face): {session.items()}')
 
             check_date = datetime.now().date()
             cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
@@ -293,6 +291,59 @@ def login_face():
     except Exception as e:
         logging.exception("Terjadi kesalahan saat memproses wajah")
         return jsonify({"status": "gagal", "pesan": "Tidak ada wajah yang ditemukan"}), 400
+
+@auth_bp.route('/login_qr', methods=['POST'])
+def login_qr():
+    data = request.get_json()
+    qr_code = data.get('qr_code')
+    user_code = data.get('user_code')
+    
+    logging.debug(f'Received qr_code: {qr_code}, user_code: {user_code}')
+    
+    connection = get_db()
+    cursor = connection.cursor()
+    cursor.execute("SELECT id, unique_code FROM users WHERE nik=%s", (qr_code,))
+    user = cursor.fetchone()
+    
+    if user:
+        logging.debug(f'User found: {user}')
+        if user_code == user[1]:
+            user_id = user[0]
+            cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_id,))
+            connection.commit()
+
+            user = User.get(user_id)
+            login_user(user)
+            
+            session['user_id'] = user_id
+            session['session_token'] = generate_session_token()
+            current_app.logger.debug(f'Session after login (QR): {session.items()}')
+
+            check_date = datetime.now().date()
+            cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
+            health_check = cursor.fetchone()
+            cursor.close()
+
+            if not health_check or not health_check[0]:
+                return jsonify({"status": "health_check_required", "user_id": user_id})
+
+            return jsonify({"status": "sukses", "user_id": user_id})
+        else:
+            logging.debug('Invalid unique code')
+            cursor.close()
+            return jsonify({"status": "gagal", "pesan": "Kode unik tidak valid"}), 401
+    else:
+        logging.debug('Invalid QR code')
+        cursor.close()
+        return jsonify({"status": "gagal", "pesan": "QR Code tidak valid"}), 401
+
+
+@auth_bp.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('auth.login'))
+
 
 @auth_bp.route('/generate_qr', methods=['GET'])
 def generate_qr():
@@ -323,49 +374,7 @@ def generate_qr():
     else:
         return jsonify({"status": "gagal", "pesan": "NIK tidak ditemukan"}), 404
 
-@auth_bp.route('/login_qr', methods=['POST'])
-def login_qr():
-    data = request.get_json()
-    qr_code = data.get('qr_code')
-    user_code = data.get('user_code')
-    
-    logging.debug(f'Received qr_code: {qr_code}, user_code: {user_code}')
-    
-    connection = get_db()
-    cursor = connection.cursor()
-    cursor.execute("SELECT id, unique_code FROM users WHERE nik=%s", (qr_code,))
-    user = cursor.fetchone()
-    
-    if user:
-        logging.debug(f'User found: {user}')
-        if user_code == user[1]:
-            user_id = user[0]
-            cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_id,))
-            connection.commit()
 
-            user = User.get(user_id)
-            login_user(user)
-            
-            session['user_id'] = user_id  # Simpan user_id dalam session
-            logging.debug(f'Session user_id set: {session.get("user_id")}')
-
-            check_date = datetime.now().date()
-            cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
-            health_check = cursor.fetchone()
-            cursor.close()
-
-            if not health_check or not health_check[0]:
-                return jsonify({"status": "health_check_required", "user_id": user_id})
-
-            return jsonify({"status": "sukses", "user_id": user_id})
-        else:
-            logging.debug('Invalid unique code')
-            cursor.close()
-            return jsonify({"status": "gagal", "pesan": "Kode unik tidak valid"}), 401
-    else:
-        logging.debug('Invalid QR code')
-        cursor.close()
-        return jsonify({"status": "gagal", "pesan": "QR Code tidak valid"}), 401
 
 @auth_bp.route('/delete_user/<int:user_id>', methods=['POST'])
 @login_required
@@ -399,3 +408,18 @@ def recognize_face(face_encoding):
         if similarity > 0.9:  
             return user_id
     return None
+
+@auth_bp.route('/send_user_id', methods=['POST'])
+@login_required
+def send_user_id():
+    data = request.get_json()
+    esp32_ip = data.get('esp32_ip')
+    user_id = current_user.id
+    current_app.logger.debug(f'Sending user_id {user_id} to ESP32 at {esp32_ip}')
+    
+    response = requests.post(f'http://{esp32_ip}/set_user_id', json={'user_id': user_id})
+    
+    if response.status_code == 200:
+        return jsonify({"status": "sukses"})
+    else:
+        return jsonify({"status": "gagal"}), 500

@@ -341,6 +341,26 @@
         .catch(error => console.error('Error:', error));
     }
 
+    function sendUserIdToESP32(user_id) {
+        const esp32_ip = '192.168.20.184'; 
+        fetch('/auth/send_user_id', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ esp32_ip: esp32_ip, user_id: user_id })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'sukses') {
+                console.log('User ID berhasil dikirim ke ESP32');
+            } else {
+                console.error('Gagal mengirim User ID ke ESP32');
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
     document.getElementById('loginForm').addEventListener('submit', function(event) {
         event.preventDefault();
         const formData = new FormData(this);
