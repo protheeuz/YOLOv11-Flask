@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, redirect, url_for, request, jsonify, flash, current_app
+from flask import Blueprint, flash, render_template, redirect, url_for, request, jsonify, current_app, session
 from flask_login import login_required, current_user, login_user
-from werkzeug.utils import secure_filename
 from database import get_db
 from models import User
 from datetime import datetime
+from werkzeug.utils import secure_filename
+import requests
 import os
 
 main_bp = Blueprint('main', __name__)
@@ -11,6 +12,7 @@ main_bp = Blueprint('main', __name__)
 @main_bp.route('/')
 @login_required
 def index():
+    user_id = request.args.get('user_id')
     connection = get_db()
     cursor = connection.cursor()
     
@@ -24,7 +26,8 @@ def index():
     recent_users = cursor.fetchall()
     
     cursor.close()
-    return render_template('home/index.html', recent_users=recent_users)
+    return render_template('home/index.html', recent_users=recent_users, user_id=user_id)
+
 
 @main_bp.route('/dashboard/<int:user_id>')
 @login_required
@@ -48,35 +51,34 @@ def health_check():
     cursor.close()
     return jsonify({'health_check_completed': health_check and health_check[0]})
 
-
 @main_bp.route('/health_check_modal')
 @login_required
 def health_check_modal():
     return render_template('health_check_modal.html')
 
-@main_bp.route('/get_sensor_data/<sensor>')
+@main_bp.route('/get_sensor_data/<sensor>', methods=['GET'])
 @login_required
 def get_sensor_data(sensor):
-    # Simulasi pengambilan data dari sensor
-    sensor_data = {
-        'heart_rate': 72,
-        'oxygen_level': 98,
-        'temperature': 36.5,
-        'activity_level': 50
-    }
-    if sensor in sensor_data:
-        return jsonify({'status': 'sukses', 'value': sensor_data[sensor]})
-    return jsonify({'status': 'gagal', 'message': 'Sensor tidak ditemukan'}), 400
+    try:
+        esp32_ip = '192.168.20.184'
+        response = requests.get(f'http://{esp32_ip}/sensor_data/{sensor}')
+        data = response.json()
+        if response.status_code == 200:
+            return jsonify({'status': 'sukses', 'value': data['value']})
+        else:
+            return jsonify({'status': 'gagal', 'message': data['message']}), 400
+    except Exception as e:
+        return jsonify({'status': 'gagal', 'message': str(e)}), 500
 
 @main_bp.route('/sensor_data', methods=['POST'])
-@login_required
 def sensor_data():
-    user_id = current_user.id  # Ambil user_id dari pengguna yang sedang login
-    heart_rate = request.form['heart_rate']
-    oxygen_level = request.form['oxygen_level']
-    temperature = request.form['temperature']
-    activity_level = request.form['activity_level']
-    ecg_value = request.form['ecg_value']
+    data = request.get_json()
+    user_id = data.get('user_id')
+    heart_rate = data.get('heart_rate')
+    oxygen_level = data.get('oxygen_level')
+    temperature = data.get('temperature')
+    activity_level = data.get('activity_level')
+    ecg_value = data.get('ecg_value')
     
     connection = get_db()
     cursor = connection.cursor()
@@ -95,6 +97,17 @@ def sensor_data():
     cursor.close()
 
     return jsonify({"status": "sukses"})
+
+
+@main_bp.route('/poll_health_check_status', methods=['GET'])
+def poll_health_check_status():
+    user_id = session.get('user_id')
+    current_app.logger.debug(f"Polling health check status, session user_id: {user_id}")
+    if user_id:
+        return jsonify({"user_id": user_id})
+    else:
+        return jsonify({"user_id": -1})
+
 
 @main_bp.route('/profile')
 @login_required

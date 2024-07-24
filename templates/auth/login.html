@@ -97,6 +97,10 @@
         font-size: 1.5em;
         font-weight: bold;
     }
+    #healthCheckModal .modal-content {
+        background-color: #333;
+        color: white;
+    }
 </style>
 {% endblock stylesheets %}
 
@@ -170,8 +174,8 @@
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="healthCheckModalLabel">Pengecekan Kesehatan</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <h5 class="modal-title" id="healthCheckModalLabel">Pengecekan Kesehatan - PT. Sinta Prima Feedmill</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
@@ -232,10 +236,12 @@
                         .then(data => {
                             if (data.status === 'sukses') {
                                 if (data.user_id) {
-                                    window.location.href = '{{ url_for("main.index", user_id=0) }}'.replace('0', data.user_id);
+                                    checkHealthStatus(data.user_id);
                                 } else {
                                     alert('User ID tidak ditemukan.');
                                 }
+                            } else if (data.status === 'health_check_required') {
+                                $('#healthCheckModal').modal('show');
                             } else {
                                 alert('Login wajah gagal: ' + data.pesan);
                             }
@@ -298,7 +304,9 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'sukses') {
-                    window.location.href = '{{ url_for("main.index", user_id=0) }}'.replace('0', data.user_id);
+                    checkHealthStatus(data.user_id);
+                } else if (data.status === 'health_check_required') {
+                    $('#healthCheckModal').modal('show');
                 } else {
                     alert('Login QR Code gagal: ' + data.pesan);
                 }
@@ -320,12 +328,14 @@
     });
 
     // Tambahkan logika modal pengecekan kesehatan
-    function checkHealthStatus() {
+    function checkHealthStatus(user_id) {
         fetch('{{ url_for("main.health_check") }}')
         .then(response => response.json())
         .then(data => {
             if (!data.health_check_completed) {
                 $('#healthCheckModal').modal('show');
+            } else {
+                window.location.href = '{{ url_for("main.index") }}?user_id=' + user_id;
             }
         })
         .catch(error => console.error('Error:', error));
@@ -341,7 +351,9 @@
         .then(response => response.json())
         .then(data => {
             if (data.status === 'sukses') {
-                checkHealthStatus();
+                checkHealthStatus(data.user_id);
+            } else if (data.status === 'health_check_required') {
+                $('#healthCheckModal').modal('show');
             } else {
                 document.getElementById('error-message').innerText = data.message;
                 document.getElementById('error-message').style.display = 'block';
@@ -350,48 +362,59 @@
         .catch(error => console.error('Error:', error));
     });
 
+    let currentStep = 1;
+
+    function startCheck(step, sensor) {
+        const button = document.getElementById(`start${step}Check`);
+        const valueDiv = document.getElementById(`${step}Value`);
+        button.disabled = true;
+        let timeLeft = 60;
+        const timer = setInterval(() => {
+            button.innerText = `Mengambil data (${timeLeft--}s)`;
+            if (timeLeft < 0) {
+                clearInterval(timer);
+                fetch(`{{ url_for('main.get_sensor_data', sensor='') }}${sensor}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'sukses') {
+                            valueDiv.innerText = `${step}: ` + data.value;
+                            if (currentStep < 4) {
+                                currentStep++;
+                                document.getElementById(`health-check-step-${currentStep - 1}`).style.display = 'none';
+                                document.getElementById(`health-check-step-${currentStep}`).style.display = 'block';
+                            } else {
+                                document.getElementById('submitHealthCheck').style.display = 'block';
+                            }
+                        } else {
+                            valueDiv.innerText = `Gagal: ` + data.message;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        valueDiv.innerText = `Gagal: ` + error.message;
+                    })
+                    .finally(() => {
+                        button.disabled = false;
+                        button.innerText = 'Cek sekarang';
+                    });
+            }
+        }, 1000);
+    }
+
     document.getElementById('startHeartRateCheck').addEventListener('click', function() {
-        fetch('{{ url_for("main.get_sensor_data") }}')
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('heartRateValue').innerText = 'Detak Jantung: ' + data.heart_rate;
-            document.getElementById('health-check-step-1').style.display = 'none';
-            document.getElementById('health-check-step-2').style.display = 'block';
-        })
-        .catch(error => console.error('Error:', error));
+        startCheck('HeartRate', 'heart_rate');
     });
 
     document.getElementById('startOxygenLevelCheck').addEventListener('click', function() {
-        fetch('{{ url_for("main.get_sensor_data") }}')
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('oxygenLevelValue').innerText = 'Level Oksigen: ' + data.oxygen_level;
-            document.getElementById('health-check-step-2').style.display = 'none';
-            document.getElementById('health-check-step-3').style.display = 'block';
-        })
-        .catch(error => console.error('Error:', error));
+        startCheck('OxygenLevel', 'oxygen_level');
     });
 
     document.getElementById('startTemperatureCheck').addEventListener('click', function() {
-        fetch('{{ url_for("main.get_sensor_data") }}')
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('temperatureValue').innerText = 'Temperatur: ' + data.temperature;
-            document.getElementById('health-check-step-3').style.display = 'none';
-            document.getElementById('health-check-step-4').style.display = 'block';
-        })
-        .catch(error => console.error('Error:', error));
+        startCheck('Temperature', 'temperature');
     });
 
     document.getElementById('startActivityLevelCheck').addEventListener('click', function() {
-        fetch('{{ url_for("main.get_sensor_data") }}')
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('activityLevelValue').innerText = 'Level Aktivitas: ' + data.activity_level;
-            document.getElementById('health-check-step-4').style.display = 'none';
-            document.getElementById('submitHealthCheck').style.display = 'block';
-        })
-        .catch(error => console.error('Error:', error));
+        startCheck('ActivityLevel', 'activity_level');
     });
 
     document.getElementById('submitHealthCheck').addEventListener('click', function() {

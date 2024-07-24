@@ -12,6 +12,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import tensorflow as tf
 from flask import Flask, render_template, redirect, url_for
 from flask_login import LoginManager, current_user, login_required
+from flask_cors import CORS
 from config import Config
 from database import close_db
 from views.auth import auth_bp
@@ -23,6 +24,8 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config.from_object(Config)
+app.secret_key = '5f957e6105f189f9974ae631b351b321'
+CORS(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)

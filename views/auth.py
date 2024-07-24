@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
-from flask import Blueprint, request, jsonify, redirect, url_for, render_template, send_file, flash, current_app
-from flask_login import login_user, logout_user, login_required
+from flask import Blueprint, request, jsonify, redirect, session, url_for, render_template, send_file, flash, current_app
+from flask_login import login_user, logout_user, login_required, current_user
 from sklearn.metrics.pairwise import cosine_similarity
 from database import get_db
 from deepface import DeepFace
@@ -193,7 +193,7 @@ def register_face():
         logging.exception("Terjadi kesalahan saat memproses wajah")
         return jsonify({"status": "gagal", "pesan": "Wajah tidak ditemukan"}), 400
 
-@auth_bp.route('/login', methods=['GET', 'POST'])
+@auth_bp.route('/login', methods=['POST', 'GET'])
 def login():
     if request.method == 'POST':
         nik = request.form['nik']
@@ -206,6 +206,8 @@ def login():
         if user_data and bcrypt.checkpw(password.encode('utf-8'), user_data[1].encode('utf-8')):
             user = User.get(user_data[0])
             login_user(user)
+            session['user_id'] = user_data[0]  # Simpan user_id dalam session
+            logging.debug(f'Session user_id set: {session.get("user_id")}')
             cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_data[0],))
             connection.commit()
 
@@ -215,12 +217,12 @@ def login():
             cursor.close()
 
             if not health_check or not health_check[0]:
-                return redirect(url_for('main.health_check_modal'))
-            
-            return redirect(url_for('main.index'))
+                return jsonify({"status": "health_check_required", "user_id": user_data[0]})
+
+            return jsonify({"status": "sukses", "user_id": user_data[0]})
 
         cursor.close()
-        return render_template('auth/login.html', msg='NIK atau password salah')
+        return jsonify({"status": "gagal", "message": "NIK atau password salah"})
 
     return render_template('auth/login.html')
 
@@ -272,8 +274,18 @@ def login_face():
 
             user = User.get(user_id)
             login_user(user)
+            
+            session['user_id'] = user_id  # Simpan user_id dalam session
+            logging.debug(f'Session user_id set: {session.get("user_id")}')
 
+            check_date = datetime.now().date()
+            cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
+            health_check = cursor.fetchone()
             cursor.close()
+
+            if not health_check or not health_check[0]:
+                return jsonify({"status": "health_check_required", "user_id": user_id})
+
             return jsonify({"status": "sukses", "user_id": user_id})
         else:
             logging.error("Wajah tidak dikenali")
@@ -330,10 +342,20 @@ def login_qr():
             user_id = user[0]
             cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_id,))
             connection.commit()
-            cursor.close()
 
             user = User.get(user_id)
             login_user(user)
+            
+            session['user_id'] = user_id  # Simpan user_id dalam session
+            logging.debug(f'Session user_id set: {session.get("user_id")}')
+
+            check_date = datetime.now().date()
+            cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
+            health_check = cursor.fetchone()
+            cursor.close()
+
+            if not health_check or not health_check[0]:
+                return jsonify({"status": "health_check_required", "user_id": user_id})
 
             return jsonify({"status": "sukses", "user_id": user_id})
         else:
