@@ -38,11 +38,11 @@ app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
 def load_user(user_id):
     return User.get(user_id)
 
-@app.before_request
-def log_request_info():
-    current_app.logger.debug('Headers: %s', request.headers)
-    current_app.logger.debug('Body: %s', request.get_data())
-    current_app.logger.debug('Session: %s', session.items())
+# @app.before_request
+# def log_request_info():
+#     current_app.logger.debug('Headers: %s', request.headers)
+#     current_app.logger.debug('Body: %s', request.get_data())
+#     current_app.logger.debug('Session: %s', session.items())
 
 @app.context_processor
 def inject_user():

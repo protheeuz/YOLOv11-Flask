@@ -423,3 +423,18 @@ def send_user_id():
         return jsonify({"status": "sukses"})
     else:
         return jsonify({"status": "gagal"}), 500
+    
+@auth_bp.route('/send_session_token', methods=['POST'])
+@login_required
+def send_session_token():
+    data = request.get_json()
+    esp32_ip = data.get('esp32_ip')
+    session_token = session.get('session_token')
+    current_app.logger.debug(f'Sending session_token {session_token} to ESP32 at {esp32_ip}')
+
+    response = requests.post(f'http://{esp32_ip}/set_session_token', json={'session_token': session_token})
+
+    if response.status_code == 200:
+        return jsonify({"status": "sukses"})
+    else:
+        return jsonify({"status": "gagal"}), 500

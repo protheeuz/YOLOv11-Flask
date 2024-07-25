@@ -361,6 +361,26 @@
         .catch(error => console.error('Error:', error));
     }
 
+   function sendSessionTokenToESP32(session_token) {
+    const esp32_ip = '192.168.20.184'; 
+    fetch('/auth/send_session_token', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ esp32_ip: esp32_ip, session_token: session_token })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'sukses') {
+            console.log('Session Token berhasil dikirim ke ESP32');
+        } else {
+            console.error('Gagal mengirim Session Token ke ESP32');
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
     document.getElementById('loginForm').addEventListener('submit', function(event) {
         event.preventDefault();
         const formData = new FormData(this);

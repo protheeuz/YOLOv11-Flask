@@ -101,13 +101,13 @@ def sensor_data():
 
 @main_bp.route('/poll_health_check_status', methods=['GET'])
 def poll_health_check_status():
+    session_token = request.headers.get('Session-Token')
     user_id = session.get('user_id')
-    session_token = session.get('session_token')
     current_app.logger.debug(f'Polling health check status, session user_id: {user_id}, session_token: {session_token}')
-    if user_id and session_token:
-        return jsonify({"user_id": user_id, "session_token": session_token})
+    if session_token and session_token == session.get('session_token'):
+        return jsonify({"user_id": user_id})
     else:
-        return jsonify({"user_id": -1, "session_token": None})
+        return jsonify({"user_id": -1})
 
 @main_bp.route('/profile')
 @login_required
