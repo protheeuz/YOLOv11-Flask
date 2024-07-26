@@ -22,6 +22,7 @@ import logging
 
 auth_bp = Blueprint('auth', __name__)
 
+
 def generate_unique_code():
     return ''.join(random.choices(string.digits, k=4))
 
@@ -209,26 +210,33 @@ def login():
         cursor.execute("SELECT id, password, role FROM users WHERE nik=%s", (nik,))
         user_data = cursor.fetchone()
 
-        if user_data and bcrypt.checkpw(password.encode('utf-8'), user_data[1].encode('utf-8')):
-            user = User.get(user_data[0])
-            login_user(user)
-            session['user_id'] = user_data[0]
-            session['session_token'] = generate_session_token()
-            current_app.logger.debug(f'Session after login (username/password): {session.items()}')
-            cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_data[0],))
-            connection.commit()
+        if user_data:
+            stored_password = user_data[1]
+            password_correct = bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8'))
+            current_app.logger.debug(f"Stored password: {stored_password}, Input password: {password}, Password correct: {password_correct}")
 
-            # Kirim user_id ke ESP32
-            if send_user_id_to_esp32(user_data[0], esp32_ip):
-                check_date = datetime.now().date()
-                cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_data[0], check_date))
-                health_check = cursor.fetchone()
-                cursor.close()
+            if password_correct:
+                user = User.get(user_data[0])
+                login_user(user)
+                session['user_id'] = user_data[0]
+                session['session_token'] = generate_session_token()
+                current_app.logger.debug(f'Session after login (username/password): {session.items()}')
+                cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_data[0],))
+                connection.commit()
 
-                if not health_check or not health_check[0]:
-                    return jsonify({"status": "health_check_required", "user_id": user_data[0]})
+                # Kirim user_id ke ESP32
+                if send_user_id_to_esp32(user_data[0], esp32_ip):
+                    check_date = datetime.now().date()
+                    cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_data[0], check_date))
+                    health_check = cursor.fetchone()
+                    cursor.close()
 
-                return jsonify({"status": "sukses", "user_id": user_data[0]})
+                    if not health_check or not health_check[0]:
+                        return jsonify({"status": "health_check_required", "user_id": user_data[0]})
+
+                    return jsonify({"status": "sukses", "user_id": user_data[0]})
+                else:
+                    return jsonify({"status": "gagal", "message": "Failed to send user_id to ESP32"})
 
         cursor.close()
         return jsonify({"status": "gagal", "message": "NIK atau password salah"})
@@ -413,9 +421,11 @@ def recognize_face(face_encoding):
 
 def send_user_id_to_esp32(user_id, esp32_ip):
     try:
-        payload = {'user_id': user_id}
+        payload = json.dumps({'user_id': user_id})
+        headers = {'Content-Type': 'application/json'}
         current_app.logger.debug(f"Sending payload to ESP32: {payload}")
-        response = requests.post(f'http://{esp32_ip}/set_user_id', json=payload)
+        current_app.logger.debug(f"Headers: {headers}")
+        response = requests.post(f'http://{esp32_ip}/set_user_id', data=payload, headers=headers)
         current_app.logger.debug(f"Response from ESP32: {response.status_code}, {response.text}")
         if response.status_code == 200:
             response_json = response.json()
@@ -425,7 +435,7 @@ def send_user_id_to_esp32(user_id, esp32_ip):
                 current_app.logger.error(f"Failed to set user_id on ESP32: {response_json}")
                 return False
         else:
-            current_app.logger.error(f"Failed to send user_id to ESP32: {response.status_code}")
+            current_app.logger.error(f"Gagal mengirimkan data user ke Mikrokontroller: {response.status_code}")
             return False
     except Exception as e:
         current_app.logger.error(f"Error sending user_id to ESP32: {e}")
