@@ -107,23 +107,35 @@ def sensor_data():
     finally:
         cursor.close()
 
-
 @main_bp.route('/request_sensor_data', methods=['POST'])
 @login_required
 def request_sensor_data():
     esp32_ip = request.json.get('esp32_ip')
     sensor = request.json.get('sensor')
+    user_id = session.get('user_id')
     
     try:
         response = requests.get(f'http://{esp32_ip}/get_sensor_data/{sensor}')
         data = response.json()
         
         if response.status_code == 200:
+            # Simpan data sensor di tabel sensor_datas
+            connection = get_db()
+            cursor = connection.cursor()
+            cursor.execute(f"""
+                INSERT INTO sensor_data (user_id, {sensor})
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE {sensor} = %s
+            """, (user_id, data['value'], data['value']))
+            connection.commit()
+            cursor.close()
+            
             return jsonify({'status': 'sukses', 'value': data['value']})
         else:
             return jsonify({'status': 'gagal', 'message': data['message']}), 400
     except Exception as e:
         return jsonify({'status': 'gagal', 'message': str(e)}), 500
+
 
 @main_bp.route('/poll_health_check_status', methods=['GET'])
 def poll_health_check_status():

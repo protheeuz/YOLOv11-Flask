@@ -224,7 +224,7 @@ def login():
                 cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_data[0],))
                 connection.commit()
 
-                # Kirim user_id ke ESP32
+                current_app.logger.debug(f"Attempting to send user_id {user_data[0]} to ESP32 at {esp32_ip}")
                 if send_user_id_to_esp32(user_data[0], esp32_ip):
                     check_date = datetime.now().date()
                     cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_data[0], check_date))
@@ -236,6 +236,7 @@ def login():
 
                     return jsonify({"status": "sukses", "user_id": user_data[0]})
                 else:
+                    current_app.logger.error("Failed to send user_id to ESP32")
                     return jsonify({"status": "gagal", "message": "Failed to send user_id to ESP32"})
 
         cursor.close()
@@ -288,15 +289,21 @@ def login_face():
             session['session_token'] = generate_session_token()
             current_app.logger.debug(f'Session after login (face): {session.items()}')
 
-            check_date = datetime.now().date()
-            cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
-            health_check = cursor.fetchone()
-            cursor.close()
+            current_app.logger.debug(f"Attempting to send user_id {user_id} to ESP32 at 192.168.20.184")
+            if send_user_id_to_esp32(user_id, '192.168.20.184'):
+                check_date = datetime.now().date()
+                cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
+                health_check = cursor.fetchone()
+                cursor.close()
 
-            if not health_check or not health_check[0]:
-                return jsonify({"status": "health_check_required", "user_id": user_id})
+                if not health_check or not health_check[0]:
+                    return jsonify({"status": "health_check_required", "user_id": user_id})
 
-            return jsonify({"status": "sukses", "user_id": user_id})
+                return jsonify({"status": "sukses", "user_id": user_id})
+            else:
+                current_app.logger.error("Failed to send user_id to ESP32")
+                return jsonify({"status": "gagal", "message": "Failed to send user_id to ESP32"})
+
         else:
             logging.error("Wajah tidak dikenali")
             return jsonify({"status": "gagal", "pesan": "Wajah tidak dikenali"}), 401
@@ -331,15 +338,20 @@ def login_qr():
             session['session_token'] = generate_session_token()
             current_app.logger.debug(f'Session after login (QR): {session.items()}')
 
-            check_date = datetime.now().date()
-            cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
-            health_check = cursor.fetchone()
-            cursor.close()
+            current_app.logger.debug(f"Attempting to send user_id {user_id} to ESP32 at 192.168.20.184")
+            if send_user_id_to_esp32(user_id, '192.168.20.184'):
+                check_date = datetime.now().date()
+                cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
+                health_check = cursor.fetchone()
+                cursor.close()
 
-            if not health_check or not health_check[0]:
-                return jsonify({"status": "health_check_required", "user_id": user_id})
+                if not health_check or not health_check[0]:
+                    return jsonify({"status": "health_check_required", "user_id": user_id})
 
-            return jsonify({"status": "sukses", "user_id": user_id})
+                return jsonify({"status": "sukses", "user_id": user_id})
+            else:
+                current_app.logger.error("Failed to send user_id to ESP32")
+                return jsonify({"status": "gagal", "message": "Failed to send user_id to ESP32"})
         else:
             logging.debug('Invalid unique code')
             cursor.close()
