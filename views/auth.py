@@ -202,6 +202,8 @@ def login():
     if request.method == 'POST':
         nik = request.form['nik']
         password = request.form['password']
+        esp32_ip = request.form.get('esp32_ip', '192.168.20.184')  # Dapatkan IP ESP32 dari form
+
         connection = get_db()
         cursor = connection.cursor()
         cursor.execute("SELECT id, password, role FROM users WHERE nik=%s", (nik,))
@@ -216,15 +218,17 @@ def login():
             cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_data[0],))
             connection.commit()
 
-            check_date = datetime.now().date()
-            cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_data[0], check_date))
-            health_check = cursor.fetchone()
-            cursor.close()
+            # Kirim user_id ke ESP32
+            if send_user_id_to_esp32(user_data[0], esp32_ip):
+                check_date = datetime.now().date()
+                cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_data[0], check_date))
+                health_check = cursor.fetchone()
+                cursor.close()
 
-            if not health_check or not health_check[0]:
-                return jsonify({"status": "health_check_required", "user_id": user_data[0]})
+                if not health_check or not health_check[0]:
+                    return jsonify({"status": "health_check_required", "user_id": user_data[0]})
 
-            return jsonify({"status": "sukses", "user_id": user_data[0]})
+                return jsonify({"status": "sukses", "user_id": user_data[0]})
 
         cursor.close()
         return jsonify({"status": "gagal", "message": "NIK atau password salah"})
@@ -374,8 +378,6 @@ def generate_qr():
     else:
         return jsonify({"status": "gagal", "pesan": "NIK tidak ditemukan"}), 404
 
-
-
 @auth_bp.route('/delete_user/<int:user_id>', methods=['POST'])
 @login_required
 def delete_user(user_id):
@@ -409,20 +411,25 @@ def recognize_face(face_encoding):
             return user_id
     return None
 
-@auth_bp.route('/send_user_id', methods=['POST'])
-@login_required
-def send_user_id():
-    data = request.get_json()
-    esp32_ip = data.get('esp32_ip')
-    user_id = current_user.id
-    current_app.logger.debug(f'Sending user_id {user_id} to ESP32 at {esp32_ip}')
-    
-    response = requests.post(f'http://{esp32_ip}/set_user_id', json={'user_id': user_id})
-    
-    if response.status_code == 200:
-        return jsonify({"status": "sukses"})
-    else:
-        return jsonify({"status": "gagal"}), 500
+def send_user_id_to_esp32(user_id, esp32_ip):
+    try:
+        payload = {'user_id': user_id}
+        current_app.logger.debug(f"Sending payload to ESP32: {payload}")
+        response = requests.post(f'http://{esp32_ip}/set_user_id', json=payload)
+        current_app.logger.debug(f"Response from ESP32: {response.status_code}, {response.text}")
+        if response.status_code == 200:
+            response_json = response.json()
+            if response_json.get("status") == "sukses":
+                return True
+            else:
+                current_app.logger.error(f"Failed to set user_id on ESP32: {response_json}")
+                return False
+        else:
+            current_app.logger.error(f"Failed to send user_id to ESP32: {response.status_code}")
+            return False
+    except Exception as e:
+        current_app.logger.error(f"Error sending user_id to ESP32: {e}")
+        return False
     
 @auth_bp.route('/send_session_token', methods=['POST'])
 @login_required

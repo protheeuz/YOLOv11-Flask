@@ -6,6 +6,8 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 import requests
 import os
+import mysql
+import mysql.connector
 
 main_bp = Blueprint('main', __name__)
 
@@ -81,23 +83,47 @@ def sensor_data():
     activity_level = data.get('activity_level')
     ecg_value = data.get('ecg_value')
     
+    if user_id == 0 or user_id is None:
+        current_app.logger.error("Invalid user_id received.")
+        return jsonify({"status": "gagal", "message": "Invalid user_id"}), 400
+    
     connection = get_db()
     cursor = connection.cursor()
     
-    current_app.logger.info(f"user_id: {user_id}, heart_rate: {heart_rate}, oxygen_level: {oxygen_level}, temperature: {temperature}, activity_level: {activity_level}, ecg_value: {ecg_value}")
-    
-    cursor.execute("""
-        INSERT INTO sensor_data (user_id, heart_rate, oxygen_level, temperature, activity_level, ecg_value)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """, (user_id, heart_rate, oxygen_level, temperature, activity_level, ecg_value))
-    
-    check_date = datetime.now().date()
-    cursor.execute("UPDATE health_checks SET completed = TRUE WHERE user_id = %s AND check_date = %s", (user_id, check_date))
-    connection.commit()
-    cursor.close()
+    try:
+        cursor.execute("""
+            INSERT INTO sensor_data (user_id, heart_rate, oxygen_level, temperature, activity_level, ecg_value)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (user_id, heart_rate, oxygen_level, temperature, activity_level, ecg_value))
+        
+        check_date = datetime.now().date()
+        cursor.execute("UPDATE health_checks SET completed = TRUE WHERE user_id = %s AND check_date = %s", (user_id, check_date))
+        connection.commit()
+        return jsonify({"status": "sukses"})
+    except mysql.connector.errors.IntegrityError as e:
+        connection.rollback()
+        current_app.logger.error(f"Database error: {e}")
+        return jsonify({"status": "gagal", "message": str(e)}), 500
+    finally:
+        cursor.close()
 
-    return jsonify({"status": "sukses"})
 
+@main_bp.route('/request_sensor_data', methods=['POST'])
+@login_required
+def request_sensor_data():
+    esp32_ip = request.json.get('esp32_ip')
+    sensor = request.json.get('sensor')
+    
+    try:
+        response = requests.get(f'http://{esp32_ip}/get_sensor_data/{sensor}')
+        data = response.json()
+        
+        if response.status_code == 200:
+            return jsonify({'status': 'sukses', 'value': data['value']})
+        else:
+            return jsonify({'status': 'gagal', 'message': data['message']}), 400
+    except Exception as e:
+        return jsonify({'status': 'gagal', 'message': str(e)}), 500
 
 @main_bp.route('/poll_health_check_status', methods=['GET'])
 def poll_health_check_status():

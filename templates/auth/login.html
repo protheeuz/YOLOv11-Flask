@@ -131,6 +131,7 @@
                     <div class="input-group mb-4">
                         <input type="password" class="form-control" id="password" name="password" placeholder="Kata Sandi" required>
                     </div>
+                    <input type="hidden" name="esp32_ip" value="192.168.20.184"> <!-- Tambahkan ini -->
                     <div class="d-flex justify-content-end mb-4">
                         <a href="{{ url_for('auth.forgot_password') }}" class="btn btn-link p-0">Lupa Password?</a>
                     </div>
@@ -402,7 +403,9 @@
         .catch(error => console.error('Error:', error));
     });
 
+    document.addEventListener('DOMContentLoaded', (event) => {
     let currentStep = 1;
+    const esp32_ip = '192.168.20.184'; // IP Address ESP32
 
     function startCheck(step, sensor) {
         const button = document.getElementById(`start${step}Check`);
@@ -413,30 +416,36 @@
             button.innerText = `Mengambil data (${timeLeft--}s)`;
             if (timeLeft < 0) {
                 clearInterval(timer);
-                fetch(`{{ url_for('main.get_sensor_data', sensor='') }}${sensor}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'sukses') {
-                            valueDiv.innerText = `${step}: ` + data.value;
-                            if (currentStep < 4) {
-                                currentStep++;
-                                document.getElementById(`health-check-step-${currentStep - 1}`).style.display = 'none';
-                                document.getElementById(`health-check-step-${currentStep}`).style.display = 'block';
-                            } else {
-                                document.getElementById('submitHealthCheck').style.display = 'block';
-                            }
+                fetch('/request_sensor_data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ esp32_ip, sensor })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'sukses') {
+                        valueDiv.innerText = `${step}: ` + data.value;
+                        if (currentStep < 4) {
+                            currentStep++;
+                            document.getElementById(`health-check-step-${currentStep - 1}`).style.display = 'none';
+                            document.getElementById(`health-check-step-${currentStep}`).style.display = 'block';
                         } else {
-                            valueDiv.innerText = `Gagal: ` + data.message;
+                            document.getElementById('submitHealthCheck').style.display = 'block';
                         }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        valueDiv.innerText = `Gagal: ` + error.message;
-                    })
-                    .finally(() => {
-                        button.disabled = false;
-                        button.innerText = 'Cek sekarang';
-                    });
+                    } else {
+                        valueDiv.innerText = `Gagal: ` + data.message;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    valueDiv.innerText = `Gagal: ` + error.message;
+                })
+                .finally(() => {
+                    button.disabled = false;
+                    button.innerText = 'Cek sekarang';
+                });
             }
         }, 1000);
     }
@@ -459,10 +468,10 @@
 
     document.getElementById('submitHealthCheck').addEventListener('click', function() {
         const formData = {
-            heart_rate: document.getElementById('heartRateValue').innerText.split(': ')[1],
-            oxygen_level: document.getElementById('oxygenLevelValue').innerText.split(': ')[1],
-            temperature: document.getElementById('temperatureValue').innerText.split(': ')[1],
-            activity_level: document.getElementById('activityLevelValue').innerText.split(': ')[1]
+            heart_rate: document.getElementById('HeartRateValue').innerText.split(': ')[1],
+            oxygen_level: document.getElementById('OxygenLevelValue').innerText.split(': ')[1],
+            temperature: document.getElementById('TemperatureValue').innerText.split(': ')[1],
+            activity_level: document.getElementById('ActivityLevelValue').innerText.split(': ')[1]
         };
         fetch('{{ url_for("main.sensor_data") }}', {
             method: "POST",
@@ -482,5 +491,6 @@
         })
         .catch(error => console.error('Error:', error));
     });
-</script>
+});
+    </script>
 {% endblock javascripts %}
