@@ -30,7 +30,7 @@ SET time_zone = "+00:00";
 CREATE TABLE `faces` (
   `user_id` int DEFAULT NULL,
   `encoding` blob
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `faces`
@@ -52,13 +52,13 @@ CREATE TABLE `health_checks` (
   `user_id` int DEFAULT NULL,
   `check_date` date DEFAULT NULL,
   `completed` tinyint(1) DEFAULT '0'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
 --
 -- Table structure for table `sensor_data`
---
+--s
 
 CREATE TABLE `sensor_data` (
   `id` int NOT NULL,
@@ -69,7 +69,7 @@ CREATE TABLE `sensor_data` (
   `temperature` float DEFAULT NULL,
   `activity_level` float DEFAULT NULL,
   `ecg_value` float DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -90,7 +90,7 @@ CREATE TABLE `users` (
   `address` varchar(255) DEFAULT NULL,
   `about` text,
   `profile_image` varchar(255) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `users`
