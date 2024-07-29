@@ -223,7 +223,7 @@ def login():
                 current_app.logger.debug(f'Session after login (username/password): {session.items()}')
                 cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_data[0],))
                 connection.commit()
-
+                
                 current_app.logger.debug(f"Attempting to send user_id {user_data[0]} to ESP32 at {esp32_ip}")
                 if send_user_id_to_esp32(user_data[0], esp32_ip):
                     check_date = datetime.now().date()
@@ -360,7 +360,6 @@ def login_qr():
         logging.debug('Invalid QR code')
         cursor.close()
         return jsonify({"status": "gagal", "pesan": "QR Code tidak valid"}), 401
-
 
 @auth_bp.route('/logout')
 @login_required

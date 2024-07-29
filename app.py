@@ -1,5 +1,6 @@
 import os
 import warnings
+from wsgiref import headers
 from dotenv import load_dotenv
 from flask_cors import CORS
 
@@ -10,6 +11,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Mengurangi log peringatan TensorFlow
 # Mengabaikan peringatan DeprecationWarning
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+import requests
 import tensorflow as tf
 from flask import Flask, current_app, render_template, redirect, request, session, url_for
 from flask_login import LoginManager, current_user, login_required
@@ -33,6 +35,8 @@ login_manager.login_view = 'auth.login'  # Tentukan endpoint login
 
 # Tambahkan konfigurasi 'UPLOAD_FOLDER'
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
+
+
 
 @login_manager.user_loader
 def load_user(user_id):
