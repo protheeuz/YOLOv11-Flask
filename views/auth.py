@@ -241,7 +241,7 @@ def login():
 
         cursor.close()
         return jsonify({"status": "gagal", "message": "NIK atau password salah"})
-
+                                                                                                                                        
     return render_template('auth/login.html')
 
 @auth_bp.route('/login_face', methods=['POST'])
