@@ -140,7 +140,7 @@ def register():
         name = request.form['name']
         email = request.form['email']
         password = request.form['password']
-        role = 'karyawan'  
+        role = request.form.get('role', 'karyawan')  # Set default role to 'karyawan' if not provided
         registration_date = datetime.now()
         unique_code = generate_unique_code()
 
@@ -166,36 +166,37 @@ def register():
 
 @auth_bp.route('/register_face', methods=['POST'])
 def register_face():
-    nik = request.form['nik']
-    name = request.form['name']
-    email = request.form['email']
-    password = request.form['password']
-    role = 'karyawan'  
-    registration_date = datetime.now()
-    unique_code = generate_unique_code()
+    data = request.get_json()
+    user_id = data.get('user_id')
     
-    face_image = request.files['face_image']
-    npimg = np.frombuffer(face_image.read(), np.uint8)
-    img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    if not cap.isOpened():
+        return jsonify({"status": "gagal", "pesan": "Tidak dapat mengakses kamera"}), 400
+
+    ret, frame = cap.read()
+    cap.release()
+
+    if not ret:
+        return jsonify({"status": "gagal", "pesan": "Tidak dapat mengambil frame dari kamera"}), 400
+
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+
+    if len(faces) == 0:
+        return jsonify({"status": "gagal", "pesan": "Tidak ada wajah yang terdeteksi"}), 400
 
     try:
-        result = DeepFace.represent(img, model_name='Facenet', enforce_detection=False)
+        result = DeepFace.represent(frame, model_name='Facenet', enforce_detection=False)
         face_encoding = result[0]["embedding"]
-
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-
+        
         connection = get_db()
         cursor = connection.cursor()
-        cursor.execute("INSERT INTO users (nik, name, email, password, registration_date, role, unique_code) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                       (nik, name, email, hashed_password, registration_date, role, unique_code))
-        connection.commit()
-        user_id = cursor.lastrowid
         cursor.execute("INSERT INTO faces (user_id, encoding) VALUES (%s, %s)", (user_id, encode_face(face_encoding)))
         connection.commit()
         cursor.close()
-        return jsonify({"status": "sukses", "user_id": user_id})
+        return jsonify({"status": "sukses"})
     except Exception as e:
-        logging.exception("Terjadi kesalahan saat memproses wajah")
         return jsonify({"status": "gagal", "pesan": "Wajah tidak ditemukan"}), 400
 
 @auth_bp.route('/login', methods=['POST', 'GET'])

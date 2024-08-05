@@ -1,3 +1,4 @@
+# views/main.py
 from flask import Blueprint, flash, render_template, redirect, url_for, request, jsonify, current_app, session
 from flask_login import login_required, current_user, login_user
 from database import get_db
@@ -6,7 +7,6 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 import requests
 import os
-import mysql
 import mysql.connector
 
 main_bp = Blueprint('main', __name__)
@@ -17,19 +17,117 @@ def index():
     user_id = request.args.get('user_id')
     connection = get_db()
     cursor = connection.cursor()
-    
-    cursor.execute("""
-        SELECT u.id, u.name, u.registration_date, h.completed 
-        FROM users u
-        LEFT JOIN health_checks h ON u.id = h.user_id AND h.check_date = CURDATE()
-        WHERE u.role='karyawan' AND u.registration_date >= DATE_SUB(NOW(), INTERVAL 2 WEEK)
-        ORDER BY u.registration_date DESC
-    """)
-    recent_users = cursor.fetchall()
-    
-    cursor.close()
-    return render_template('home/index.html', recent_users=recent_users, user_id=user_id)
 
+    if current_user.role == 'admin':
+        cursor.execute("""
+            SELECT u.id, u.name, u.registration_date, h.completed 
+            FROM users u
+            LEFT JOIN health_checks h ON u.id = h.user_id AND h.check_date = CURDATE()
+            WHERE u.role='karyawan' AND u.registration_date >= DATE_SUB(NOW(), INTERVAL 2 WEEK)
+            ORDER BY u.registration_date DESC
+        """)
+        recent_users = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT 
+                DATE(check_date) as date, 
+                AVG(completed) as daily_health
+            FROM health_checks
+            GROUP BY DATE(check_date)
+            ORDER BY DATE(check_date) DESC
+            LIMIT 30
+        """)
+        daily_health_data_raw = cursor.fetchall()
+
+        cursor.close()
+
+        # Process the data for charts
+        health_check_labels = [stat[0].strftime('%d %b') for stat in daily_health_data_raw]
+        daily_health_data = [stat[1] * 100 for stat in daily_health_data_raw]  # Convert to percentage
+        weekly_health_data = []
+        monthly_health_data = []
+
+        # Calculate weekly and monthly averages
+        for i in range(0, len(daily_health_data_raw), 7):
+            weekly_avg = sum(d[1] for d in daily_health_data_raw[i:i+7]) / 7 * 100
+            weekly_health_data.append(weekly_avg)
+
+        for i in range(0, len(daily_health_data_raw), 30):
+            monthly_avg = sum(d[1] for d in daily_health_data_raw[i:i+30]) / 30 * 100
+            monthly_health_data.append(monthly_avg)
+
+        return render_template('home/index_admin.html',
+                               recent_users=recent_users,
+                               health_check_labels=health_check_labels,
+                               daily_health_data=daily_health_data,
+                               weekly_health_data=weekly_health_data,
+                               monthly_health_data=monthly_health_data)
+    else:
+        cursor.execute("""
+            SELECT heart_rate, oxygen_level, temperature, activity_level 
+            FROM sensor_data
+            WHERE user_id = %s ORDER BY timestamp DESC LIMIT 1
+        """, (current_user.id,))
+        latest_health_data = cursor.fetchone()
+
+        cursor.execute("""
+            SELECT ecg_value, timestamp 
+            FROM sensor_data
+            WHERE user_id = %s ORDER BY timestamp DESC
+        """, (current_user.id,))
+        ecg_data = cursor.fetchall()
+
+        cursor.close()
+
+        ecg_values = [data[0] for data in ecg_data]
+        ecg_timestamps = [data[1].strftime('%H:%M:%S') for data in ecg_data]
+
+        return render_template('home/index_karyawan.html',
+                               latest_health_data=latest_health_data,
+                               ecg_values=ecg_values,
+                               ecg_timestamps=ecg_timestamps,
+                               recent_users=recent_users)
+
+@main_bp.route('/notifications')
+@login_required
+def notifications():
+    if current_user.role != 'admin':
+        return jsonify({"error": "Unauthorized"}), 403
+
+    new_notifications = get_new_logins_for_admin()
+    old_notifications = get_old_logins_for_admin()
+    new_logins_count = len(new_notifications)
+
+    return render_template('includes/navigation.html',
+                           new_notifications=new_notifications,
+                           old_notifications=old_notifications,
+                           new_logins_count=new_logins_count)
+
+def get_new_logins_for_admin():
+    connection = get_db()
+    cursor = connection.cursor()
+    cursor.execute("""
+        SELECT name, last_login, TIMESTAMPDIFF(MINUTE, last_login, NOW()) as time_ago
+        FROM users
+        WHERE last_login >= CURDATE()
+        ORDER BY last_login DESC
+    """)
+    logins = cursor.fetchall()
+    cursor.close()
+    return [{'user_name': login[0], 'time_ago': f'{login[2]} min', 'message': 'Baru login'} for login in logins]
+
+def get_old_logins_for_admin():
+    connection = get_db()
+    cursor = connection.cursor()
+    cursor.execute("""
+        SELECT name, last_login, TIMESTAMPDIFF(MINUTE, last_login, NOW()) as time_ago
+        FROM users
+        WHERE last_login < CURDATE()
+        ORDER BY last_login DESC
+    """)
+    logins = cursor.fetchall()
+    cursor.close()
+    return [{'user_name': login[0], 'time_ago': f'{login[2]} min', 'message': 'Login sebelumnya'} for login in logins]
 
 @main_bp.route('/dashboard/<int:user_id>')
 @login_required
@@ -71,7 +169,6 @@ def get_sensor_data(sensor):
             return jsonify({'status': 'gagal', 'message': data['message']}), 400
     except Exception as e:
         return jsonify({'status': 'gagal', 'message': str(e)}), 500
-
 
 @main_bp.route('/sensor_data', methods=['POST'])
 def sensor_data():
@@ -119,7 +216,6 @@ def request_sensor_data():
         data = response.json()
         
         if response.status_code == 200:
-            # Simpan data sensor di tabel sensor_datas
             connection = get_db()
             cursor = connection.cursor()
             cursor.execute(f"""
@@ -135,7 +231,6 @@ def request_sensor_data():
             return jsonify({'status': 'gagal', 'message': data['message']}), 400
     except Exception as e:
         return jsonify({'status': 'gagal', 'message': str(e)}), 500
-
 
 @main_bp.route('/poll_health_check_status', methods=['GET'])
 def poll_health_check_status():
@@ -206,3 +301,24 @@ def update_profile_image():
 
         flash('Foto profil berhasil diperbarui.', 'success')
     return redirect(url_for('main.profile'))
+
+@main_bp.route('/employee_list')
+@login_required
+def employee_list():
+    if current_user.role != 'admin':
+        return redirect(url_for('main.index'))
+    
+    connection = get_db()
+    cursor = connection.cursor()
+    
+    cursor.execute("""
+        SELECT nik, name, registration_date, last_login, address, about
+        FROM users
+        WHERE role = 'karyawan'
+        ORDER BY registration_date DESC
+    """)
+    employees = cursor.fetchall()
+    
+    cursor.close()
+    
+    return render_template('home/employee_list.html', employees=employees)

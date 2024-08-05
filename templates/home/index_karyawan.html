@@ -1,0 +1,114 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Dashboard Karyawan{% endblock %}
+
+{% block stylesheets %}{% endblock stylesheets %}
+
+{% block content %}
+<!-- [ Main Content ] start -->
+<div class="pcoded-main-container">
+    <div class="pcoded-wrapper">
+        <div class="pcoded-content">
+            <div class="pcoded-inner-content">
+                <div class="main-body">
+                    <div class="page-wrapper">
+                        <!-- [ Main Content ] start -->
+                        <div class="row">
+                            <!-- [ Card Sections for Sensors ] start -->
+                            <div class="col-md-6 col-xl-4">
+                                <div class="card heart-rate">
+                                    <div class="card-block">
+                                        <h6 class="mb-4">Detak Jantung</h6>
+                                        <div class="row d-flex align-items-center">
+                                            <div class="col-9">
+                                                <h3 class="f-w-300 d-flex align-items-center  m-b-0">
+                                                    <i class="feather icon-heart text-c-red f-30 m-r-10"></i>{{ latest_health_data.heart_rate }} bpm
+                                                </h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 col-xl-4">
+                                <div class="card oxygen-level">
+                                    <div class="card-block">
+                                        <h6 class="mb-4">Level Oksigen</h6>
+                                        <div class="row d-flex align-items-center">
+                                            <div class="col-9">
+                                                <h3 class="f-w-300 d-flex align-items-center  m-b-0">
+                                                    <i class="feather icon-droplet text-c-blue f-30 m-r-10"></i>{{ latest_health_data.oxygen_level }}%
+                                                </h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 col-xl-4">
+                                <div class="card temperature">
+                                    <div class="card-block">
+                                        <h6 class="mb-4">Temperatur</h6>
+                                        <div class="row d-flex align-items-center">
+                                            <div class="col-9">
+                                                <h3 class="f-w-300 d-flex align-items-center  m-b-0">
+                                                    <i class="feather icon-thermometer text-c-green f-30 m-r-10"></i>{{ latest_health_data.temperature }}°C
+                                                </h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 col-xl-4">
+                                <div class="card activity-level">
+                                    <div class="card-block">
+                                        <h6 class="mb-4">Level Aktivitas</h6>
+                                        <div class="row d-flex align-items-center">
+                                            <div class="col-9">
+                                                <h3 class="f-w-300 d-flex align-items-center  m-b-0">
+                                                    <i class="feather icon-activity text-c-yellow f-30 m-r-10"></i>{{ latest_health_data.activity_level }}
+                                                </h3>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-xl-12 col-md-12">
+                                <div class="card ecg-graph">
+                                    <div class="card-block">
+                                        <h6 class="mb-4">Grafik ECG</h6>
+                                        <div id="morris-line-smooth-chart" style="height:300px"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- [ Card Sections for Sensors ] end -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block javascripts %}
+<script src="{{ url_for('static', filename='assets/plugins/chart-morris/js/raphael.min.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/plugins/chart-morris/js/morris.min.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', (event) => {
+        Morris.Line({
+            element: 'morris-line-smooth-chart',
+            data: [
+                {% for timestamp, value in ecg_data %}
+                { timestamp: '{{ timestamp }}', value: {{ value }} },
+                {% endfor %}
+            ],
+            xkey: 'timestamp',
+            ykeys: ['value'],
+            labels: ['ECG Value'],
+            smooth: true,
+            resize: true,
+            lineColors: ['#1de9b6'],
+            parseTime: false
+        });
+    });
+</script>
+{% endblock javascripts %}

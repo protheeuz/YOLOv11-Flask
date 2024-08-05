@@ -38,52 +38,54 @@
                     <input type="checkbox" id="theme-switch" class="d-none">
                 </label>
             </li>
+            {% if current_user.role == 'admin' %}
             <li>
                 <div class="dropdown">
-                    <a class="dropdown-toggle" href="javascript:" data-toggle="dropdown"><i class="icon feather icon-bell"></i></a>
+                    <a class="dropdown-toggle" href="javascript:" data-toggle="dropdown">
+                        <i class="icon feather icon-bell"></i>
+                        {% if new_logins_count > 0 %}
+                        <span class="badge badge-danger">{{ new_logins_count }}</span>
+                        {% endif %}
+                    </a>
                     <div class="dropdown-menu dropdown-menu-right notification">
                         <div class="noti-head">
                             <h6 class="d-inline-block m-b-0">Notifikasi</h6>
                             <div class="float-right">
-                                <a href="javascript:" class="m-r-10">tandai sudah dibaca</a>
-                                <a href="javascript:">bersihkan semua</a>
+                                <a href="javascript:" class="m-r-10">Tandai sudah dibaca</a>
+                                <a href="javascript:">Bersihkan semua</a>
                             </div>
                         </div>
                         <ul class="noti-body">
                             <li class="n-title"><p class="m-b-0">BARU</p></li>
-                            <li class="notification">
-                                <div class="media">
-                                    <img class="img-radius" src="{{ url_for('static', filename='assets/images/user/avatar-1.jpg') }}" alt="Generic placeholder image">
-                                    <div class="media-body">
-                                        <p><strong>John Doe</strong><span class="n-time text-muted"><i class="icon feather icon-clock m-r-10"></i>30 min</span></p>
-                                        <p>Tiket baru ditambahkan</p>
-                                    </div>
-                                </div>
-                            </li>
-                            <li class="n-title"><p class="m-b-0">SEBELUMNYA</p></li>
+                            {% for notif in new_notifications %}
                             <li class="notification">
                                 <div class="media">
                                     <img class="img-radius" src="{{ url_for('static', filename='assets/images/user/avatar-2.jpg') }}" alt="Generic placeholder image">
                                     <div class="media-body">
-                                        <p><strong>Joseph William</strong><span class="n-time text-muted"><i class="icon feather icon-clock m-r-10"></i>30 min</span></p>
-                                        <p>Pembelian Tema Baru dan pembayaran</p>
+                                        <p><strong>{{ notif.user_name }}</strong><span class="n-time text-muted"><i class="icon feather icon-clock m-r-10"></i>{{ notif.time_ago }}</span></p>
+                                        <p>{{ notif.message }}</p>
                                     </div>
                                 </div>
                             </li>
+                            {% endfor %}
+                            <li class="n-title"><p class="m-b-0">SEBELUMNYA</p></li>
+                            {% for notif in old_notifications %}
                             <li class="notification">
                                 <div class="media">
-                                    <img class="img-radius" src="{{ url_for('static', filename='assets/images/user/avatar-3.jpg') }}" alt="Generic placeholder image">
+                                    <img class="img-radius" src="{{ url_for('static', filename='assets/images/user/avatar-2.jpg') }}" alt="Generic placeholder image">
                                     <div class="media-body">
-                                        <p><strong>Sara Soudein</strong><span class="n-time text-muted"><i class="icon feather icon-clock m-r-10"></i>30 min</span></p>
-                                        <p>Sedang login</p>
+                                        <p><strong>{{ notif.user_name }}</strong><span class="n-time text-muted"><i class="icon feather icon-clock m-r-10"></i>{{ notif.time_ago }}</span></p>
+                                        <p>{{ notif.message }}</p>
                                     </div>
                                 </div>
                             </li>
+                            {% endfor %}
                         </ul>
-                        <div class="noti-footer"><a href="javascript:">lihat semua</a></div>
+                        <div class="noti-footer"><a href="javascript:">Lihat semua</a></div>
                     </div>
                 </div>
             </li>
+            {% endif %}
             <li>
                 <div class="dropdown drp-user">
                     <a href="javascript:" class="dropdown-toggle" data-toggle="dropdown">
@@ -91,7 +93,7 @@
                     </a>
                     <div class="dropdown-menu dropdown-menu-right profile-notification">
                         <div class="pro-head">
-                            <img src="{{ url_for('static', filename='assets/images/user/avatar-1.jpg') }}" class="img-radius" alt="User-Profile-Image">
+                            <img src="{{ url_for('static', filename=current_user.profile_image) if current_user.profile_image else url_for('static', filename='assets/images/user/avatar-2.jpg') }}" class="img-radius" alt="User-Profile-Image">
                             <span class="user-info">
                                 {% if current_user.is_authenticated %}
                                     {{ current_user.name }} <br> 

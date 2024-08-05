@@ -1,3 +1,4 @@
+# app.py
 import os
 import warnings
 from wsgiref import headers
@@ -16,7 +17,7 @@ import tensorflow as tf
 from flask import Flask, current_app, render_template, redirect, request, session, url_for
 from flask_login import LoginManager, current_user, login_required
 from config import Config
-from database import close_db
+from database import close_db, get_db
 from views.auth import auth_bp
 from views.main import main_bp
 from models import User
@@ -40,15 +41,24 @@ app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
 def load_user(user_id):
     return User.get(user_id)
 
-# @app.before_request
-# def log_request_info():
-#     current_app.logger.debug('Headers: %s', request.headers)
-#     current_app.logger.debug('Body: %s', request.get_data())
-#     current_app.logger.debug('Session: %s', session.items())
-
 @app.context_processor
 def inject_user():
-    return dict(current_user=current_user)
+    new_logins_count = 0
+    if current_user.is_authenticated and current_user.role == 'admin':
+        new_logins_count = get_new_logins_count()
+    return dict(current_user=current_user, new_logins_count=new_logins_count)
+
+def get_new_logins_count():
+    connection = get_db()
+    cursor = connection.cursor()
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM users
+        WHERE last_login >= CURDATE()
+    """)
+    count = cursor.fetchone()[0]
+    cursor.close()
+    return count
 
 # Daftarkan blueprint untuk autentikasi dan rute utama
 app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -56,7 +66,6 @@ app.register_blueprint(main_bp)
 
 @app.teardown_appcontext
 def teardown_db(exception):
-    # Tutup koneksi database saat aplikasi selesai
     close_db()
 
 @app.route('/')

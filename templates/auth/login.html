@@ -202,9 +202,14 @@
                     <button type="button" class="btn btn-primary" id="startActivityLevelCheck">Cek sekarang</button>
                     <div id="activityLevelValue"></div>
                 </div>
+                <div id="health-check-step-5" style="display: none;">
+                    <p>ECG:</p>
+                    <button type="button" class="btn btn-primary" id="startECGCheck">Cek sekarang</button>
+                    <div id="ecgValue"></div>
+                </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Tutup</button>
                 <button type="button" class="btn btn-primary" id="submitHealthCheck" style="display: none;">Submit</button>
             </div>
         </div>
@@ -408,94 +413,158 @@ document.getElementById('loginForm').addEventListener('submit', function(event) 
     .catch(error => console.error('Error:', error));
 });
 
-    document.addEventListener('DOMContentLoaded', (event) => {
-        let currentStep = 1;
-        const esp32_ip = '192.168.20.184'; // IP Address ESP32
+document.addEventListener('DOMContentLoaded', (event) => {
+    let currentStep = 1;
+    const esp32_ip = '192.168.20.184'; // IP Address ESP32
 
-        function startCheck(step, sensor) {
-            const button = document.getElementById(`start${step}Check`);
-            const valueDiv = document.getElementById(`${step}Value`);
-            button.disabled = true;
-            let timeLeft = 60;
-            const timer = setInterval(() => {
-                button.innerText = `Mengambil data (${timeLeft--}s)`;
-                if (timeLeft < 0) {
-                    clearInterval(timer);
-                    fetch('/request_sensor_data', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ esp32_ip, sensor })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'sukses') {
-                            valueDiv.innerText = `${step}: ` + data.value;
-                            if (currentStep < 4) {
-                                currentStep++;
-                                document.getElementById(`health-check-step-${currentStep - 1}`).style.display = 'none';
-                                document.getElementById(`health-check-step-${currentStep}`).style.display = 'block';
-                            } else {
-                                document.getElementById('submitHealthCheck').style.display = 'block';
-                            }
+    function startCheck(step, sensor) {
+        const button = document.getElementById(`start${step}Check`);
+        const valueDiv = document.getElementById(`${step}Value`);
+        button.disabled = true;
+        let timeLeft = 60;
+        const timer = setInterval(() => {
+            button.innerText = `Mengambil data (${timeLeft--}s)`;
+            if (timeLeft < 0) {
+                clearInterval(timer);
+                fetch('/request_sensor_data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ esp32_ip, sensor })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'sukses') {
+                        valueDiv.innerText = `${step}: ` + data.value;
+                        if (currentStep < 5) {
+                            currentStep++;
+                            document.getElementById(`health-check-step-${currentStep - 1}`).style.display = 'none';
+                            document.getElementById(`health-check-step-${currentStep}`).style.display = 'block';
                         } else {
-                            valueDiv.innerText = `Gagal: ` + data.message;
+                            document.getElementById('submitHealthCheck').style.display = 'block';
                         }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        valueDiv.innerText = `Gagal: ` + error.message;
-                    })
-                    .finally(() => {
-                        button.disabled = false;
-                        button.innerText = 'Cek sekarang';
-                    });
-                }
-            }, 1000);
-        }
+                    } else {
+                        valueDiv.innerText = `Gagal: ` + data.message;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    valueDiv.innerText = `Gagal: ` + error.message;
+                })
+                .finally(() => {
+                    button.disabled = false;
+                    button.innerText = 'Cek sekarang';
+                });
+            }
+        }, 1000);
+    }
 
-        document.getElementById('startHeartRateCheck').addEventListener('click', function() {
-            startCheck('HeartRate', 'heart_rate');
-        });
-
-        document.getElementById('startOxygenLevelCheck').addEventListener('click', function() {
-            startCheck('OxygenLevel', 'oxygen_level');
-        });
-
-        document.getElementById('startTemperatureCheck').addEventListener('click', function() {
-            startCheck('Temperature', 'temperature');
-        });
-
-        document.getElementById('startActivityLevelCheck').addEventListener('click', function() {
-            startCheck('ActivityLevel', 'activity_level');
-        });
-
-        document.getElementById('submitHealthCheck').addEventListener('click', function() {
-            const formData = {
-                heart_rate: document.getElementById('HeartRateValue').innerText.split(': ')[1],
-                oxygen_level: document.getElementById('OxygenLevelValue').innerText.split(': ')[1],
-                temperature: document.getElementById('TemperatureValue').innerText.split(': ')[1],
-                activity_level: document.getElementById('ActivityLevelValue').innerText.split(': ')[1]
-            };
-            fetch('{{ url_for("main.sensor_data") }}', {
-                method: "POST",
+    function startECGCheck() {
+        const button = document.getElementById('startECGCheck');
+        const valueDiv = document.getElementById('ecgValue');
+        button.disabled = true;
+        let ecgData = [];
+        let timeLeft = 60;
+        const timer = setInterval(() => {
+            button.innerText = `Mengambil data (${timeLeft--}s)`;
+            fetch('/request_sensor_data', {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify({ esp32_ip: esp32_ip, sensor: 'ecg' })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'sukses') {
-                    $('#healthCheckModal').modal('hide');
-                    window.location.href = "{{ url_for('main.index') }}";
-                } else {
-                    alert('Gagal menyimpan data kesehatan');
+                    ecgData.push(data.value);
                 }
             })
             .catch(error => console.error('Error:', error));
-        });
+
+            if (timeLeft < 0) {
+                clearInterval(timer);
+                valueDiv.innerText = `ECG data collected for 60 seconds.`;
+                // Send ECG data to the server
+                fetch('/store_ecg_data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ecg_data: ecgData })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'sukses') {
+                        if (currentStep < 5) {
+                            currentStep++;
+                            document.getElementById(`health-check-step-${currentStep - 1}`).style.display = 'none';
+                            document.getElementById(`health-check-step-${currentStep}`).style.display = 'block';
+                        } else {
+                            document.getElementById('submitHealthCheck').style.display = 'block';
+                        }
+                    } else {
+                        valueDiv.innerText = `Gagal: ` + data.message;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    valueDiv.innerText = `Gagal: ` + error.message;
+                })
+                .finally(() => {
+                    button.disabled = false;
+                    button.innerText = 'Cek sekarang';
+                });
+            }
+        }, 1000);
+    }
+
+    document.getElementById('startHeartRateCheck').addEventListener('click', function() {
+        startCheck('HeartRate', 'heart_rate');
     });
+
+    document.getElementById('startOxygenLevelCheck').addEventListener('click', function() {
+        startCheck('OxygenLevel', 'oxygen_level');
+    });
+
+    document.getElementById('startTemperatureCheck').addEventListener('click', function() {
+        startCheck('Temperature', 'temperature');
+    });
+
+    document.getElementById('startActivityLevelCheck').addEventListener('click', function() {
+        startCheck('ActivityLevel', 'activity_level');
+    });
+
+    document.getElementById('startECGCheck').addEventListener('click', function() {
+        startECGCheck();
+    });
+
+    document.getElementById('submitHealthCheck').addEventListener('click', function() {
+        const formData = {
+            heart_rate: document.getElementById('heartRateValue').innerText.split(': ')[1],
+            oxygen_level: document.getElementById('oxygenLevelValue').innerText.split(': ')[1],
+            temperature: document.getElementById('temperatureValue').innerText.split(': ')[1],
+            activity_level: document.getElementById('activityLevelValue').innerText.split(': ')[1]
+        };
+        fetch('{{ url_for("main.sensor_data") }}', {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'sukses') {
+                $('#healthCheckModal').modal('hide');
+                window.location.href = "{{ url_for('main.index') }}";
+            } else {
+                alert('Gagal menyimpan data kesehatan');
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    });
+});
 </script>
 {% endblock javascripts %}

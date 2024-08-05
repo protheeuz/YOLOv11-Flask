@@ -1,20 +1,17 @@
 {% extends "layouts/base.html" %}
 
-{% block title %} Dashboard {% endblock %} 
+{% block title %}Dashboard Admin{% endblock %}
 
 {% block stylesheets %}{% endblock stylesheets %}
 
 {% block content %}
-<!-- [ Main Content ] start -->
 <div class="pcoded-main-container">
     <div class="pcoded-wrapper">
         <div class="pcoded-content">
             <div class="pcoded-inner-content">
                 <div class="main-body">
                     <div class="page-wrapper">
-                        <!-- [ Main Content ] start -->
                         <div class="row">
-                            <!-- [ Daily, Weekly, Monthly Health Section ] start -->
                             <div class="col-md-6 col-xl-4">
                                 <div class="card daily-health">
                                     <div class="card-block">
@@ -75,9 +72,6 @@
                                     </div>
                                 </div>
                             </div>
-                            <!-- [ Daily, Weekly, Monthly Health Section ] end -->
-
-                            <!-- [ Recent Users ] start -->
                             <div class="col-xl-8 col-md-6">
                                 <div class="card Recent-Users">
                                     <div class="card-header">
@@ -112,22 +106,16 @@
                                     </div>
                                 </div>
                             </div>
-                            <!-- [ Recent Users ] end -->
-
-                            <!-- [ Health Check Statistics ] start -->
                             <div class="col-xl-12 col-md-12">
                                 <div class="card health-check-statistics">
                                     <div class="card-header">
                                         <h5>Statistik Pengecekan Kesehatan</h5>
                                     </div>
                                     <div class="card-block">
-                                        <canvas id="healthCheckChart" width="400" height="200"></canvas>
+                                        <div id="morris-line-smooth-chart-admin" style="height:300px"></div>
                                     </div>
                                 </div>
                             </div>
-                            <!-- [ Health Check Statistics ] end -->
-
-                            <!-- [ Employee Health Rating ] starts -->
                             <div class="col-xl-4 col-md-6">
                                 <div class="card user-list">
                                     <div class="card-header">
@@ -196,9 +184,6 @@
                                     </div>
                                 </div>
                             </div>
-                            <!-- [ Employee Health Rating ] end -->
-
-                            <!-- [ Tabs ] starts -->
                             <div class="col-xl-8 col-md-12 m-b-30">
                                 <ul class="nav nav-tabs" id="myTab" role="tablist">
                                     <li class="nav-item">
@@ -236,7 +221,6 @@
                                                 <td><h6 class="m-0 text-c-green">Selesai</h6></td>
                                                 <td class="text-right"><i class="fas fa-circle text-c-green f-10"></i></td>
                                             </tr>
-                                            <!-- Add more rows as needed -->
                                             </tbody>
                                         </table>
                                     </div>
@@ -276,7 +260,6 @@
                                                 <td><h6 class="m-0 text-c-green">Selesai</h6></td>
                                                 <td class="text-right"><i class="fas fa-circle text-c-green f-10"></i></td>
                                             </tr>
-                                            <!-- Add more rows as needed -->
                                             </tbody>
                                         </table>
                                     </div>
@@ -304,62 +287,39 @@
                                                 <td><h6 class="m-0 text-c-green">Selesai</h6></td>
                                                 <td class="text-right"><i class="fas fa-circle text-c-green f-10"></i></td>
                                             </tr>
-                                            <!-- Add more rows as needed -->
                                             </tbody>
                                         </table>
                                     </div>
                                 </div>
                             </div>
-                            <!-- [ Tabs ] end -->
                         </div>
-                        <!-- [ Main Content ] end -->
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-<!-- [ Main Content ] end -->
-
 {% endblock content %}
 
 {% block javascripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='assets/plugins/chart-morris/js/raphael.min.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/plugins/chart-morris/js/morris.min.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', (event) => {
-        const ctx = document.getElementById('healthCheckChart').getContext('2d');
-        const healthCheckChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: {{ health_check_labels|safe }},
-                datasets: [
-                    {
-                        label: 'Pengecekan Harian',
-                        data: {{ daily_health_data|safe }},
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'Pengecekan Mingguan',
-                        data: {{ weekly_health_data|safe }},
-                        borderColor: 'rgba(153, 102, 255, 1)',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'Pengecekan Bulanan',
-                        data: {{ monthly_health_data|safe }},
-                        borderColor: 'rgba(255, 159, 64, 1)',
-                        borderWidth: 1
-                    }
-                ]
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
-            }
+        Morris.Line({
+            element: 'morris-line-smooth-chart-admin',
+            data: [
+                {% for timestamp, value in ecg_data %}
+                { timestamp: '{{ timestamp }}', value: {{ value }} },
+                {% endfor %}
+            ],
+            xkey: 'timestamp',
+            ykeys: ['value'],
+            labels: ['ECG Value'],
+            smooth: true,
+            resize: true,
+            lineColors: ['#1de9b6'],
+            parseTime: false
         });
     });
 </script>
