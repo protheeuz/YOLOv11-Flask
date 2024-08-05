@@ -237,7 +237,7 @@
                         .then(data => {
                             if (data.status === 'sukses') {
                                 if (data.user_id) {
-                                    checkHealthStatus(data.user_id);
+                                    checkHealthStatus(data.user_id, 'admin'); // Pass role to checkHealthStatus
                                 } else {
                                     alert('User ID tidak ditemukan.');
                                 }
@@ -305,7 +305,7 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'sukses') {
-                    checkHealthStatus(data.user_id);
+                    checkHealthStatus(data.user_id, 'admin'); // Pass role to checkHealthStatus
                 } else if (data.status === 'health_check_required') {
                     $('#healthCheckModal').modal('show');
                 } else {
@@ -329,14 +329,19 @@
     });
 
     // Tambahkan logika modal pengecekan kesehatan
-    function checkHealthStatus(user_id) {
+    function checkHealthStatus(user_id, role) {
+        if (role === 'admin') {
+            window.location.href = '{{ url_for("main.index") }}?user_id=' + user_id;
+            return;
+        }
+
         fetch('{{ url_for("main.health_check") }}')
         .then(response => response.json())
         .then(data => {
-            if (!data.health_check_completed) {
-                $('#healthCheckModal').modal('show');
-            } else {
+            if (data.health_check_completed) {
                 window.location.href = '{{ url_for("main.index") }}?user_id=' + user_id;
+            } else {
+                $('#healthCheckModal').modal('show');
             }
         })
         .catch(error => console.error('Error:', error));
@@ -382,26 +387,26 @@
     .catch(error => console.error('Error:', error));
 }
 
-    document.getElementById('loginForm').addEventListener('submit', function(event) {
-        event.preventDefault();
-        const formData = new FormData(this);
-        fetch(this.action, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'sukses') {
-                checkHealthStatus(data.user_id);
-            } else if (data.status === 'health_check_required') {
-                $('#healthCheckModal').modal('show');
-            } else {
-                document.getElementById('error-message').innerText = data.message;
-                document.getElementById('error-message').style.display = 'block';
-            }
-        })
-        .catch(error => console.error('Error:', error));
-    });
+document.getElementById('loginForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+    const formData = new FormData(this);
+    fetch(this.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'sukses') {
+            checkHealthStatus(data.user_id, 'admin'); // Pass role to checkHealthStatus
+        } else if (data.status === 'health_check_required') {
+            $('#healthCheckModal').modal('show');
+        } else {
+            document.getElementById('error-message').innerText = data.message;
+            document.getElementById('error-message').style.display = 'block';
+        }
+    })
+    .catch(error => console.error('Error:', error));
+});
 
     document.addEventListener('DOMContentLoaded', (event) => {
         let currentStep = 1;

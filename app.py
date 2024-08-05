@@ -36,8 +36,6 @@ login_manager.login_view = 'auth.login'  # Tentukan endpoint login
 # Tambahkan konfigurasi 'UPLOAD_FOLDER'
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
 
-
-
 @login_manager.user_loader
 def load_user(user_id):
     return User.get(user_id)

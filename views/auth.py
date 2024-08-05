@@ -223,8 +223,12 @@ def login():
                 current_app.logger.debug(f'Session after login (username/password): {session.items()}')
                 cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_data[0],))
                 connection.commit()
+
+                # Skip health check if the user is an admin
+                if user_data[2] == 'admin':
+                    return jsonify({"status": "sukses", "user_id": user_data[0]})
                 
-                current_app.logger.debug(f"Attempting to send user_id {user_data[0]} to ESP32 at {esp32_ip}")
+                current_app.logger.debug(f"Attempting to send user_id {user_data[0]} ke ESP 32 at {esp32_ip}")
                 if send_user_id_to_esp32(user_data[0], esp32_ip):
                     check_date = datetime.now().date()
                     cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_data[0], check_date))
@@ -236,8 +240,8 @@ def login():
 
                     return jsonify({"status": "sukses", "user_id": user_data[0]})
                 else:
-                    current_app.logger.error("Failed to send user_id to ESP32")
-                    return jsonify({"status": "gagal", "message": "Failed to send user_id to ESP32"})
+                    current_app.logger.error("Gagal mengirim user_id ke ESP 32")
+                    return jsonify({"status": "gagal", "message": "Gagal mengirim user_id ke ESP 32"})
 
         cursor.close()
         return jsonify({"status": "gagal", "message": "NIK atau password salah"})
@@ -279,6 +283,8 @@ def login_face():
             logging.debug(f"Wajah dikenali, user_id: {user_id}")
             connection = get_db()
             cursor = connection.cursor()
+            cursor.execute("SELECT role FROM users WHERE id=%s", (user_id,))
+            user_role = cursor.fetchone()[0]
             cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_id,))
             connection.commit()
 
@@ -289,7 +295,11 @@ def login_face():
             session['session_token'] = generate_session_token()
             current_app.logger.debug(f'Session after login (face): {session.items()}')
 
-            current_app.logger.debug(f"Attempting to send user_id {user_id} to ESP32 at 192.168.20.184")
+            # Skip health check if the user is an admin
+            if user_role == 'admin':
+                return jsonify({"status": "sukses", "user_id": user_id})
+
+            current_app.logger.debug(f"Attempting to send user_id {user_id} ke ESP 32 at 192.168.20.184")
             if send_user_id_to_esp32(user_id, '192.168.20.184'):
                 check_date = datetime.now().date()
                 cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
@@ -301,8 +311,8 @@ def login_face():
 
                 return jsonify({"status": "sukses", "user_id": user_id})
             else:
-                current_app.logger.error("Failed to send user_id to ESP32")
-                return jsonify({"status": "gagal", "message": "Failed to send user_id to ESP32"})
+                current_app.logger.error("Gagal mengirim user_id ke ESP 32")
+                return jsonify({"status": "gagal", "message": "Gagal mengirim user_id ke ESP 32"})
 
         else:
             logging.error("Wajah tidak dikenali")
@@ -321,13 +331,14 @@ def login_qr():
     
     connection = get_db()
     cursor = connection.cursor()
-    cursor.execute("SELECT id, unique_code FROM users WHERE nik=%s", (qr_code,))
+    cursor.execute("SELECT id, unique_code, role FROM users WHERE nik=%s", (qr_code,))
     user = cursor.fetchone()
     
     if user:
         logging.debug(f'User found: {user}')
         if user_code == user[1]:
             user_id = user[0]
+            user_role = user[2]
             cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_id,))
             connection.commit()
 
@@ -338,7 +349,11 @@ def login_qr():
             session['session_token'] = generate_session_token()
             current_app.logger.debug(f'Session after login (QR): {session.items()}')
 
-            current_app.logger.debug(f"Attempting to send user_id {user_id} to ESP32 at 192.168.20.184")
+            # Skip health check if the user is an admin
+            if user_role == 'admin':
+                return jsonify({"status": "sukses", "user_id": user_id})
+
+            current_app.logger.debug(f"Attempting to send user_id {user_id} ke ESP 32 at 192.168.20.184")
             if send_user_id_to_esp32(user_id, '192.168.20.184'):
                 check_date = datetime.now().date()
                 cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
@@ -350,8 +365,8 @@ def login_qr():
 
                 return jsonify({"status": "sukses", "user_id": user_id})
             else:
-                current_app.logger.error("Failed to send user_id to ESP32")
-                return jsonify({"status": "gagal", "message": "Failed to send user_id to ESP32"})
+                current_app.logger.error("Gagal mengirim user_id ke ESP 32")
+                return jsonify({"status": "gagal", "message": "Gagal mengirim user_id ke ESP 32"})
         else:
             logging.debug('Invalid unique code')
             cursor.close()
@@ -434,7 +449,7 @@ def send_user_id_to_esp32(user_id, esp32_ip):
     try:
         payload = json.dumps({'user_id': user_id})
         headers = {'Content-Type': 'application/json'}
-        current_app.logger.debug(f"Sending payload to ESP32: {payload}")
+        current_app.logger.debug(f"Sending payload ke ESP 32: {payload}")
         current_app.logger.debug(f"Headers: {headers}")
         response = requests.post(f'http://{esp32_ip}/set_user_id', data=payload, headers=headers)
         current_app.logger.debug(f"Response from ESP32: {response.status_code}, {response.text}")
@@ -449,7 +464,7 @@ def send_user_id_to_esp32(user_id, esp32_ip):
             current_app.logger.error(f"Gagal mengirimkan data user ke Mikrokontroller: {response.status_code}")
             return False
     except Exception as e:
-        current_app.logger.error(f"Error sending user_id to ESP32: {e}")
+        current_app.logger.error(f"Error sending user_id ke ESP 32: {e}")
         return False
     
 @auth_bp.route('/send_session_token', methods=['POST'])
@@ -458,7 +473,7 @@ def send_session_token():
     data = request.get_json()
     esp32_ip = data.get('esp32_ip')
     session_token = session.get('session_token')
-    current_app.logger.debug(f'Sending session_token {session_token} to ESP32 at {esp32_ip}')
+    current_app.logger.debug(f'Sending session_token {session_token} ke ESP 32 at {esp32_ip}')
 
     response = requests.post(f'http://{esp32_ip}/set_session_token', json={'session_token': session_token})
 
