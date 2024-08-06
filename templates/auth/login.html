@@ -125,13 +125,13 @@
                     <div class="alert alert-danger" id="error-message" style="display: none;"></div>
                 {% endif %}
                 <form id="loginForm" action="{{ url_for('auth.login') }}" method="POST">
-                    <div class="input-group mb-3">
+                    <div class="input-group mb3">
                         <input type="text" class="form-control" id="nik" name="nik" placeholder="NIK" required>
                     </div>
                     <div class="input-group mb-4">
                         <input type="password" class="form-control" id="password" name="password" placeholder="Kata Sandi" required>
                     </div>
-                    <input type="hidden" name="esp32_ip" value="192.168.20.184"> <!-- Tambahkan ini -->
+                    <input type="hidden" name="esp32_ip" value="192.168.20.114"> <!-- Tambahkan ini -->
                     <div class="d-flex justify-content-end mb-4">
                         <a href="{{ url_for('auth.forgot_password') }}" class="btn btn-link p-0">Lupa Password?</a>
                     </div>
@@ -184,26 +184,31 @@
                 <p>PENGECEKAN KESEHATAN</p>
                 <div id="health-check-step-1">
                     <p>DETAK JANTUNG:</p>
+                    <p>Tempatkan jari Anda pada infra-merah yang ada pada sensor, tahan beberapa saat sampai mendapatkan hasil.</p>
                     <button type="button" class="btn btn-primary" id="startHeartRateCheck">Cek sekarang</button>
                     <div id="heartRateValue"></div>
                 </div>
                 <div id="health-check-step-2" style="display: none;">
                     <p>LEVEL OKSIGEN:</p>
+                    <p>Tempatkan jari Anda pada infra-merah yang ada pada sensor, tahan beberapa saat sampai mendapatkan hasil.</p>
                     <button type="button" class="btn btn-primary" id="startOxygenLevelCheck">Cek sekarang</button>
                     <div id="oxygenLevelValue"></div>
                 </div>
                 <div id="health-check-step-3" style="display: none;">
                     <p>TEMPERATUR:</p>
+                    <p>Pastikan sensor temperatur berada di lingkungan yang stabil, tahan beberapa saat sampai mendapatkan hasil.</p>
                     <button type="button" class="btn btn-primary" id="startTemperatureCheck">Cek sekarang</button>
                     <div id="temperatureValue"></div>
                 </div>
                 <div id="health-check-step-4" style="display: none;">
                     <p>LEVEL AKTIVITAS:</p>
+                    <p>Lakukan beberapa gerakan ringan seperti menggoyangkan tangan atau kaki untuk mengukur aktivitas Anda.</p>
                     <button type="button" class="btn btn-primary" id="startActivityLevelCheck">Cek sekarang</button>
                     <div id="activityLevelValue"></div>
                 </div>
                 <div id="health-check-step-5" style="display: none;">
                     <p>ECG:</p>
+                    <p>Pastikan jari Anda menyentuh elektroda dengan baik, tahan beberapa saat sampai mendapatkan hasil.</p>
                     <button type="button" class="btn btn-primary" id="startECGCheck">Cek sekarang</button>
                     <div id="ecgValue"></div>
                 </div>
@@ -353,7 +358,7 @@
     }
 
     function sendUserIdToESP32(user_id) {
-        const esp32_ip = '192.168.20.184'; 
+        const esp32_ip = '192.168.20.114'; 
         fetch('/auth/send_user_id', {
             method: 'POST',
             headers: {
@@ -373,7 +378,7 @@
     }
 
    function sendSessionTokenToESP32(session_token) {
-    const esp32_ip = '192.168.20.184'; 
+    const esp32_ip = '192.168.20.114'; 
     fetch('/auth/send_session_token', {
         method: 'POST',
         headers: {
@@ -415,7 +420,7 @@ document.getElementById('loginForm').addEventListener('submit', function(event) 
 
 document.addEventListener('DOMContentLoaded', (event) => {
     let currentStep = 1;
-    const esp32_ip = '192.168.20.184'; // IP Address ESP32
+    const esp32_ip = '192.168.20.114'; // IP Address ESP32
 
     function startCheck(step, sensor) {
         const button = document.getElementById(`start${step}Check`);

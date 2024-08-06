@@ -1,9 +1,8 @@
-# views/main.py
 from flask import Blueprint, flash, render_template, redirect, url_for, request, jsonify, current_app, session
 from flask_login import login_required, current_user, login_user
 from database import get_db
 from models import User
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import requests
 import os
@@ -39,6 +38,37 @@ def index():
         """)
         daily_health_data_raw = cursor.fetchall()
 
+        # Get health checks for today, this week, and all
+        today = datetime.now().date()
+        start_of_week = today - timedelta(days=today.weekday())
+
+        cursor.execute("""
+            SELECT u.name, s.timestamp, h.completed, u.profile_image
+            FROM users u
+            LEFT JOIN sensor_data s ON u.id = s.user_id
+            LEFT JOIN health_checks h ON u.id = h.user_id AND h.check_date = CURDATE()
+            WHERE u.role='karyawan' AND DATE(s.timestamp) = CURDATE()
+        """)
+        today_health_checks = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT u.name, s.timestamp, h.completed, u.profile_image
+            FROM users u
+            LEFT JOIN sensor_data s ON u.id = s.user_id
+            LEFT JOIN health_checks h ON u.id = h.user_id AND h.check_date >= %s AND h.check_date <= %s
+            WHERE u.role='karyawan' AND DATE(s.timestamp) >= %s AND DATE(s.timestamp) <= %s
+        """, (start_of_week, today, start_of_week, today))
+        weekly_health_checks = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT u.name, s.timestamp, h.completed, u.profile_image
+            FROM users u
+            LEFT JOIN sensor_data s ON u.id = s.user_id
+            LEFT JOIN health_checks h ON u.id = h.user_id
+            WHERE u.role='karyawan'
+        """)
+        all_health_checks = cursor.fetchall()
+
         cursor.close()
 
         # Process the data for charts
@@ -61,7 +91,10 @@ def index():
                                health_check_labels=health_check_labels,
                                daily_health_data=daily_health_data,
                                weekly_health_data=weekly_health_data,
-                               monthly_health_data=monthly_health_data)
+                               monthly_health_data=monthly_health_data,
+                               today_health_checks=today_health_checks,
+                               weekly_health_checks=weekly_health_checks,
+                               all_health_checks=all_health_checks)
     else:
         cursor.execute("""
             SELECT heart_rate, oxygen_level, temperature, activity_level 
@@ -85,8 +118,7 @@ def index():
         return render_template('home/index_karyawan.html',
                                latest_health_data=latest_health_data,
                                ecg_values=ecg_values,
-                               ecg_timestamps=ecg_timestamps,
-                               recent_users=recent_users)
+                               ecg_timestamps=ecg_timestamps)
 
 @main_bp.route('/notifications')
 @login_required
@@ -160,7 +192,7 @@ def health_check_modal():
 @login_required
 def get_sensor_data(sensor):
     try:
-        esp32_ip = '192.168.20.184'
+        esp32_ip = '192.168.20.114'
         response = requests.get(f'http://{esp32_ip}/sensor_data/{sensor}')
         data = response.json()
         if response.status_code == 200:
@@ -210,11 +242,11 @@ def request_sensor_data():
     esp32_ip = request.json.get('esp32_ip')
     sensor = request.json.get('sensor')
     user_id = session.get('user_id')
-    
+
     try:
         response = requests.get(f'http://{esp32_ip}/get_sensor_data/{sensor}')
         data = response.json()
-        
+
         if response.status_code == 200:
             connection = get_db()
             cursor = connection.cursor()
@@ -225,7 +257,7 @@ def request_sensor_data():
             """, (user_id, data['value'], data['value']))
             connection.commit()
             cursor.close()
-            
+
             return jsonify({'status': 'sukses', 'value': data['value']})
         else:
             return jsonify({'status': 'gagal', 'message': data['message']}), 400

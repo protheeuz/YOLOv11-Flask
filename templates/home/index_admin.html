@@ -12,7 +12,7 @@
                 <div class="main-body">
                     <div class="page-wrapper">
                         <div class="row">
-                            <div class="col-md-6 col-xl-4">
+                            <div class="col-md-4">
                                 <div class="card daily-health">
                                     <div class="card-block">
                                         <h6 class="mb-4">Kesehatan Harian</h6>
@@ -32,13 +32,13 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-6 col-xl-4">
+                            <div class="col-md-4">
                                 <div class="card weekly-health">
                                     <div class="card-block">
                                         <h6 class="mb-4">Kesehatan Mingguan</h6>
                                         <div class="row d-flex align-items-center">
                                             <div class="col-9">
-                                                <h3 class="f-w-300 d-flex align-items-center  m-b-0">
+                                                <h3 class="f-w-300 d-flex align-items-center m-b-0">
                                                     <i class="feather icon-arrow-down text-c-red f-30 m-r-10"></i>75%
                                                 </h3>
                                             </div>
@@ -52,7 +52,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-12 col-xl-4">
+                            <div class="col-md-4">
                                 <div class="card monthly-health">
                                     <div class="card-block">
                                         <h6 class="mb-4">Kesehatan Bulanan</h6>
@@ -72,7 +72,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-xl-8 col-md-6">
+                            <div class="col-xl-6 col-md-6">
                                 <div class="card Recent-Users">
                                     <div class="card-header">
                                         <h5>Pengguna Terbaru</h5>
@@ -83,20 +83,16 @@
                                                 <tbody>
                                                 {% for user in recent_users %}
                                                 <tr class="unread">
-                                                    <td><img class="rounded-circle" style="width:40px;" src="{{ url_for('static', filename='assets/images/user/avatar-1.jpg') }}" alt="activity-user"></td>
+                                                    <td><img class="rounded-circle" style="width:40px;" src="{{ url_for('static', filename=user[4] if user[4] else 'assets/images/user/avatar-2.jpg') }}" alt="activity-user"></td>
                                                     <td>
                                                         <h6 class="mb-1">{{ user[1] }}</h6>
                                                         <p class="m-0">{{ 'Pengecekan selesai' if user[3] else 'Pengecekan belum selesai' }}</p>
                                                     </td>
                                                     <td>
                                                         <h6 class="text-muted">
-                                                            <i class="fas fa-circle {% if user[3] %}text-c-green{% else %}text-c-red{% endif %} f-10 m-r-15"></i>
+                                                            <i class="fas fa-circle {% if user[3] %}text-c-green{% else %}text-c-orange{% endif %} f-10 m-r-15"></i>
                                                             {{ user[2].strftime('%d %b %H:%M') }}
                                                         </h6>
-                                                    </td>
-                                                    <td>
-                                                        <a href="#!" class="label theme-bg2 text-white f-12">Tolak</a>
-                                                        <a href="#!" class="label theme-bg text-white f-12">Setujui</a>
                                                     </td>
                                                 </tr>
                                                 {% endfor %}
@@ -106,13 +102,148 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-xl-12 col-md-12">
+                            <div class="col-xl-6 col-md-6">
                                 <div class="card health-check-statistics">
                                     <div class="card-header">
                                         <h5>Statistik Pengecekan Kesehatan</h5>
                                     </div>
                                     <div class="card-block">
                                         <div id="morris-line-smooth-chart-admin" style="height:300px"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-xl-12 col-md-12 m-b-30">
+                                <ul class="nav nav-tabs" id="myTab" role="tablist">
+                                    <li class="nav-item">
+                                        <a class="nav-link" id="home-tab" data-toggle="tab" href="#home" role="tab" aria-controls="home" aria-selected="false">Hari Ini</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link active show" id="profile-tab" data-toggle="tab" href="#profile" role="tab" aria-controls="profile" aria-selected="true">Minggu Ini</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" id="contact-tab" data-toggle="tab" href="#contact" role="tab" aria-controls="contact" aria-selected="false">Semua</a>
+                                    </li>
+                                </ul>
+                                <div class="tab-content" id="myTabContent">
+                                    <div class="tab-pane fade" id="home" role="tabpanel" aria-labelledby="home-tab">
+                                        <table class="table table-hover">
+                                            <thead>
+                                            <tr>
+                                                <th>Pengguna</th>
+                                                <th>Aktivitas</th>
+                                                <th>Waktu</th>
+                                                <th>Status</th>
+                                                <th class="text-right"></th>
+                                            </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for check in today_health_checks %}
+                                            <tr>
+                                                <td>
+                                                    <h6 class="m-0">
+                                                        <img class="rounded-circle m-r-10" style="width:40px;" src="{{ url_for('static', filename=check[3] if check[3] else 'assets/images/user/avatar-2.jpg') }}" alt="activity-user">
+                                                        {{ check[0] }}
+                                                    </h6>
+                                                </td>
+                                                <td>
+                                                    <h6 class="m-0">
+                                                        {% if check[2] %}
+                                                            Sudah melakukan pengecekan
+                                                        {% else %}
+                                                            Belum melakukan pengecekan
+                                                        {% endif %}
+                                                    </h6>
+                                                </td>
+                                                <td>
+                                                    <h6 class="m-0">{{ check[1].strftime('%H:%M') if check[1] else 'N/A' }}</h6>
+                                                </td>
+                                                <td>
+                                                    <i class="fas fa-circle {% if check[2] %}text-c-green{% else %}text-c-orange{% endif %} f-10"></i>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="tab-pane fade active show" id="profile" role="tabpanel" aria-labelledby="profile-tab">
+                                        <table class="table table-hover">
+                                            <thead>
+                                            <tr>
+                                                <th>Pengguna</th>
+                                                <th>Aktivitas</th>
+                                                <th>Waktu</th>
+                                                <th>Status</th>
+                                                <th class="text-right"></th>
+                                            </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for check in weekly_health_checks %}
+                                            <tr>
+                                                <td>
+                                                    <h6 class="m-0">
+                                                        <img class="rounded-circle m-r-10" style="width:40px;" src="{{ url_for('static', filename=check[3] if check[3] else 'assets/images/user/avatar-2.jpg') }}" alt="activity-user">
+                                                        {{ check[0] }}
+                                                    </h6>
+                                                </td>
+                                                <td>
+                                                    <h6 class="m-0">
+                                                        {% if check[2] %}
+                                                            Sudah melakukan pengecekan
+                                                        {% else %}
+                                                            Belum melakukan pengecekan
+                                                        {% endif %}
+                                                    </h6>
+                                                </td>
+                                                <td>
+                                                    <h6 class="m-0">{{ check[1].strftime('%H:%M') if check[1] else 'N/A' }}</h6>
+                                                </td>
+                                                <td>
+                                                    <i class="fas fa-circle {% if check[2] %}text-c-green{% else %}text-c-orange{% endif %} f-10"></i>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="tab-pane fade" id="contact" role="tabpanel" aria-labelledby="contact-tab">
+                                        <table class="table table-hover">
+                                            <thead>
+                                            <tr>
+                                                <th>Pengguna</th>
+                                                <th>Aktivitas</th>
+                                                <th>Waktu</th>
+                                                <th>Status</th>
+                                                <th class="text-right"></th>
+                                            </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for check in all_health_checks %}
+                                            <tr>
+                                                <td>
+                                                    <h6 class="m-0">
+                                                        <img class="rounded-circle m-r-10" style="width:40px;" src="{{ url_for('static', filename=check[3] if check[3] else 'assets/images/user/avatar-2.jpg') }}" alt="activity-user">
+                                                        {{ check[0] }}
+                                                    </h6>
+                                                </td>
+                                                <td>
+                                                    <h6 class="m-0">
+                                                        {% if check[2] %}
+                                                            Sudah melakukan pengecekan
+                                                        {% else %}
+                                                            Belum melakukan pengecekan
+                                                        {% endif %}
+                                                    </h6>
+                                                </td>
+                                                <td>
+                                                    <h6 class="m-0">{{ check[1].strftime('%H:%M') if check[1] else 'N/A' }}</h6>
+                                                </td>
+                                                <td>
+                                                    <i class="fas fa-circle {% if check[2] %}text-c-green{% else %}text-c-red{% endif %} f-10"></i>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
@@ -184,114 +315,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-xl-8 col-md-12 m-b-30">
-                                <ul class="nav nav-tabs" id="myTab" role="tablist">
-                                    <li class="nav-item">
-                                        <a class="nav-link" id="home-tab" data-toggle="tab" href="#home" role="tab" aria-controls="home" aria-selected="false">Hari Ini</a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a class="nav-link active show" id="profile-tab" data-toggle="tab" href="#profile" role="tab" aria-controls="profile" aria-selected="true">Minggu Ini</a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a class="nav-link" id="contact-tab" data-toggle="tab" href="#contact" role="tab" aria-controls="contact" aria-selected="false">Semua</a>
-                                    </li>
-                                </ul>
-                                <div class="tab-content" id="myTabContent">
-                                    <div class="tab-pane fade" id="home" role="tabpanel" aria-labelledby="home-tab">
-                                        <table class="table table-hover">
-                                            <thead>
-                                            <tr>
-                                                <th>Pengguna</th>
-                                                <th>Aktivitas</th>
-                                                <th>Waktu</th>
-                                                <th>Status</th>
-                                                <th class="text-right"></th>
-                                            </tr>
-                                            </thead>
-                                            <tbody>
-                                            <tr>
-                                                <td>
-                                                    <h6 class="m-0">
-                                                        <img class="rounded-circle m-r-10" style="width:40px;" src="{{ url_for('static', filename='assets/images/user/avatar-1.jpg') }}" alt="activity-user">
-                                                        Ida Jorgensen
-                                                    </h6>
-                                                </td>
-                                                <td><h6 class="m-0">Sudah melakukan pengecekan</h6></td>
-                                                <td><h6 class="m-0">3:28 PM</h6></td>
-                                                <td><h6 class="m-0 text-c-green">Selesai</h6></td>
-                                                <td class="text-right"><i class="fas fa-circle text-c-green f-10"></i></td>
-                                            </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div class="tab-pane fade active show" id="profile" role="tabpanel" aria-labelledby="profile-tab">
-                                        <table class="table table-hover">
-                                            <thead>
-                                            <tr>
-                                                <th>Pengguna</th>
-                                                <th>Aktivitas</th>
-                                                <th>Waktu</th>
-                                                <th>Status</th>
-                                                <th class="text-right"></th>
-                                            </tr>
-                                            </thead>
-                                            <tbody>
-                                            <tr>
-                                                <td>
-                                                    <h6 class="m-0">
-                                                        <img class="rounded-circle  m-r-10" style="width:40px;" src="{{ url_for('static', filename='assets/images/user/avatar-2.jpg') }}" alt="activity-user">
-                                                        Mukhlis Setyanto
-                                                    </h6>
-                                                </td>
-                                                <td><h6 class="m-0">Sudah melakukan pengecekan</h6></td>
-                                                <td><h6 class="m-0">2:37 PM</h6></td>
-                                                <td><h6 class="m-0 text-c-green">Selesai</h6></td>
-                                                <td class="text-right"><i class="fas fa-circle text-c-green f-10"></i></td>
-                                            </tr>
-                                            <tr>
-                                                <td>
-                                                    <h6 class="m-0">
-                                                        <img class="rounded-circle m-r-10" style="width:40px;" src="{{ url_for('static', filename='assets/images/user/avatar-1.jpg') }}" alt="activity-user">
-                                                        Iqbal Fauzi
-                                                    </h6>
-                                                </td>
-                                                <td><h6 class="m-0">Sudah melakukan pengecekan</h6></td>
-                                                <td><h6 class="m-0">3:28 PM</h6></td>
-                                                <td><h6 class="m-0 text-c-green">Selesai</h6></td>
-                                                <td class="text-right"><i class="fas fa-circle text-c-green f-10"></i></td>
-                                            </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div class="tab-pane fade" id="contact" role="tabpanel" aria-labelledby="contact-tab">
-                                        <table class="table table-hover">
-                                            <thead>
-                                            <tr>
-                                                <th>Pengguna</th>
-                                                <th>Aktivitas</th>
-                                                <th>Waktu</th>
-                                                <th>Status</th>
-                                                <th class="text-right"></th>
-                                            </tr>
-                                            </thead>
-                                            <tbody>
-                                            <tr>
-                                                <td>
-                                                    <h6 class="m-0">
-                                                        <img class="rounded-circle  m-r-10" style="width:40px;" src="{{ url_for('static', filename='assets/images/user/avatar-3.jpg') }}" alt="activity-user">
-                                                        Silje Larsen
-                                                    </h6>
-                                                </td>
-                                                <td><h6 class="m-0">Sudah melakukan pengecekan</h6></td>
-                                                <td><h6 class="m-0">10:23 AM</h6></td>
-                                                <td><h6 class="m-0 text-c-green">Selesai</h6></td>
-                                                <td class="text-right"><i class="fas fa-circle text-c-green f-10"></i></td>
-                                            </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
+                            <!-- Hapus bagian statistik pengecekan kesehatan kedua -->
                         </div>
                     </div>
                 </div>
@@ -309,8 +333,8 @@
         Morris.Line({
             element: 'morris-line-smooth-chart-admin',
             data: [
-                {% for timestamp, value in ecg_data %}
-                { timestamp: '{{ timestamp }}', value: {{ value }} },
+                {% for item in ecg_data %}
+                { timestamp: '{{ item[1]|tojson }}', value: {{ item[0]|tojson }} },
                 {% endfor %}
             ],
             xkey: 'timestamp',
