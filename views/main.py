@@ -192,7 +192,7 @@ def health_check_modal():
 @login_required
 def get_sensor_data(sensor):
     try:
-        esp32_ip = '192.168.20.114'
+        esp32_ip = '192.168.1.16'
         response = requests.get(f'http://{esp32_ip}/sensor_data/{sensor}')
         data = response.json()
         if response.status_code == 200:
@@ -354,3 +354,21 @@ def employee_list():
     cursor.close()
     
     return render_template('home/employee_list.html', employees=employees)
+
+@main_bp.route('/send_lcd_data', methods=['POST'])
+@login_required
+def send_lcd_data():
+    step = request.json.get('step')
+    value = request.json.get('value')
+    esp32_ip = '192.168.1.16'
+
+    try:
+        response = requests.post(f'http://{esp32_ip}/update_lcd', json={'step': step, 'value': value})
+        data = response.json()
+
+        if response.status_code == 200 and data['status'] == 'sukses':
+            return jsonify({'status': 'sukses'})
+        else:
+            return jsonify({'status': 'gagal', 'message': data.get('message', 'Unknown error')}), 400
+    except Exception as e:
+        return jsonify({'status': 'gagal', 'message': str(e)}), 500

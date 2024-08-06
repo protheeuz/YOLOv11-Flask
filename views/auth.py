@@ -204,7 +204,7 @@ def login():
     if request.method == 'POST':
         nik = request.form['nik']
         password = request.form['password']
-        esp32_ip = request.form.get('esp32_ip', '192.168.20.114')  # Dapatkan IP ESP32 dari form
+        esp32_ip = request.form.get('esp32_ip', '192.168.1.16')  # Dapatkan IP ESP32 dari form
 
         connection = get_db()
         cursor = connection.cursor()
@@ -300,8 +300,8 @@ def login_face():
             if user_role == 'admin':
                 return jsonify({"status": "sukses", "user_id": user_id})
 
-            current_app.logger.debug(f"Attempting to send user_id {user_id} ke ESP 32 at 192.168.20.114")
-            if send_user_id_to_esp32(user_id, '192.168.20.114'):
+            current_app.logger.debug(f"Attempting to send user_id {user_id} ke ESP 32 at 192.168.1.16")
+            if send_user_id_to_esp32(user_id, '192.168.1.16'):
                 check_date = datetime.now().date()
                 cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
                 health_check = cursor.fetchone()
@@ -354,8 +354,8 @@ def login_qr():
             if user_role == 'admin':
                 return jsonify({"status": "sukses", "user_id": user_id})
 
-            current_app.logger.debug(f"Attempting to send user_id {user_id} ke ESP 32 at 192.168.20.114")
-            if send_user_id_to_esp32(user_id, '192.168.20.114'):
+            current_app.logger.debug(f"Attempting to send user_id {user_id} ke ESP 32 at 192.168.1.16")
+            if send_user_id_to_esp32(user_id, '192.168.1.16'):
                 check_date = datetime.now().date()
                 cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
                 health_check = cursor.fetchone()
