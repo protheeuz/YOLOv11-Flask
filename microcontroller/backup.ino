@@ -10,6 +10,7 @@
 #include <HTTPClient.h>
 #include <LiquidCrystal_I2C.h>
 #include "spo2_algorithm.h"
+#include "esp_task_wdt.h"
 
 // WiFi Credentials
 const char* ssid = "Fathermustache";
@@ -200,6 +201,7 @@ void setup() {
       redBuffer[i] = particleSensor.getRed();
       irBuffer[i] = particleSensor.getIR();
       particleSensor.nextSample();
+      esp_task_wdt_reset(); // Reset watchdog timer
     }
     int8_t validSPO2;
     int8_t validHeartRate;
@@ -223,6 +225,7 @@ void setup() {
       redBuffer[i] = particleSensor.getRed();
       irBuffer[i] = particleSensor.getIR();
       particleSensor.nextSample();
+      esp_task_wdt_reset(); // Reset watchdog timer
     }
     int8_t validSPO2;
     int8_t validHeartRate;
@@ -270,6 +273,9 @@ void setup() {
 }
 
 void loop() {
+  // Reset watchdog timer
+  esp_task_wdt_reset();
+
   // Update LCD
   tcaSelect(0);
   lcd.setCursor(0, 0);

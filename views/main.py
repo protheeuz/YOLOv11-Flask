@@ -1,3 +1,4 @@
+# views/main.py
 from flask import Blueprint, flash, render_template, redirect, url_for, request, jsonify, current_app, session
 from flask_login import login_required, current_user, login_user
 from database import get_db
@@ -172,14 +173,14 @@ def health_check():
     user_id = current_user.id
     connection = get_db()
     cursor = connection.cursor()
-    
+
     cursor.execute("""
         SELECT completed 
         FROM health_checks 
         WHERE user_id = %s AND check_date = CURDATE()
     """, (user_id,))
     health_check = cursor.fetchone()
-    
+
     cursor.close()
     return jsonify({'health_check_completed': health_check and health_check[0]})
 
@@ -196,7 +197,7 @@ def get_sensor_data(sensor):
         response = requests.get(f'http://{esp32_ip}/get_sensor_data/{sensor}')
         data = response.json()
         if response.status_code == 200:
-            return jsonify({'status': 'sukses', 'value': data['value']})
+            return jsonify({'status': 'sukses', 'value': data})
         else:
             return jsonify({'status': 'gagal', 'message': data['message']}), 400
     except Exception as e:
@@ -210,21 +211,28 @@ def sensor_data():
     oxygen_level = data.get('oxygen_level')
     temperature = data.get('temperature')
     activity_level = data.get('activity_level')
-    ecg_value = data.get('ecg_value')
-    
+    ecg_values = data.get('value')  # Mengambil array nilai ECG
+
     if user_id == 0 or user_id is None:
         current_app.logger.error("Invalid user_id received.")
         return jsonify({"status": "gagal", "message": "Invalid user_id"}), 400
-    
+
     connection = get_db()
     cursor = connection.cursor()
-    
+
     try:
         cursor.execute("""
-            INSERT INTO sensor_data (user_id, heart_rate, oxygen_level, temperature, activity_level, ecg_value)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (user_id, heart_rate, oxygen_level, temperature, activity_level, ecg_value))
-        
+            INSERT INTO sensor_data (user_id, heart_rate, oxygen_level, temperature, activity_level)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (user_id, heart_rate, oxygen_level, temperature, activity_level))
+
+        if ecg_values:
+            for ecg_value in ecg_values:
+                cursor.execute("""
+                    INSERT INTO ecg_data (user_id, ecg_value, timestamp)
+                    VALUES (%s, %s, NOW())
+                """, (user_id, ecg_value))
+
         check_date = datetime.now().date()
         cursor.execute("UPDATE health_checks SET completed = TRUE WHERE user_id = %s AND check_date = %s", (user_id, check_date))
         connection.commit()
@@ -241,7 +249,7 @@ def sensor_data():
 def request_sensor_data():
     esp32_ip = request.json.get('esp32_ip')
     sensor = request.json.get('sensor')
-    user_id = session.get('user_id')
+    user_id = current_user.id
 
     try:
         response = requests.get(f'http://{esp32_ip}/get_sensor_data/{sensor}')
@@ -251,14 +259,13 @@ def request_sensor_data():
             connection = get_db()
             cursor = connection.cursor()
             cursor.execute(f"""
-                INSERT INTO sensor_data (user_id, heart_rate, oxygen_level)
-                VALUES (%s, %s, %s)
-                ON DUPLICATE KEY UPDATE heart_rate = %s, oxygen_level = %s
-            """, (user_id, data['heart_rate'], data['oxygen_level'], data['heart_rate'], data['oxygen_level']))
+                INSERT INTO sensor_data (user_id, {sensor})
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE {sensor} = %s
+            """, (user_id, data['value'], data['value']))
             connection.commit()
             cursor.close()
-
-            return jsonify({'status': 'sukses', 'value': data['heart_rate']})
+            return jsonify({'status': 'sukses', sensor: data['value']})
         else:
             return jsonify({'status': 'gagal', 'message': data['message']}), 400
     except Exception as e:
@@ -291,16 +298,16 @@ def update_profile():
     name = request.form['name']
     address = request.form['address']
     about = request.form['about']
-    
+
     connection = get_db()
     cursor = connection.cursor()
-    
+
     cursor.execute("""
         UPDATE users
         SET name = %s, address = %s, about = %s
         WHERE id = %s
     """, (name, address, about, current_user.id))
-    
+
     connection.commit()
     cursor.close()
 
@@ -316,7 +323,7 @@ def update_profile_image():
     profile_image = request.files.get('profile_image')
     if (profile_image):
         profile_image_filename = save_profile_image(profile_image)
-        
+
         connection = get_db()
         cursor = connection.cursor()
         cursor.execute("""
@@ -324,7 +331,7 @@ def update_profile_image():
             SET profile_image = %s
             WHERE id = %s
         """, (profile_image_filename, current_user.id))
-        
+
         connection.commit()
         cursor.close()
 
@@ -339,10 +346,10 @@ def update_profile_image():
 def employee_list():
     if current_user.role != 'admin':
         return redirect(url_for('main.index'))
-    
+
     connection = get_db()
     cursor = connection.cursor()
-    
+
     cursor.execute("""
         SELECT nik, name, registration_date, last_login, address, about
         FROM users
@@ -350,7 +357,7 @@ def employee_list():
         ORDER BY registration_date DESC
     """)
     employees = cursor.fetchall()
-    
+
     cursor.close()
-    
+
     return render_template('home/employee_list.html', employees=employees)

@@ -130,7 +130,7 @@ void loop() {
   // Check if WiFi is connected and user ID is set
   if (WiFi.status() == WL_CONNECTED && user_id != -1) {
     HTTPClient http;
-    http.begin("http://192.168.20.136:5000/sensor_data");
+    http.begin("http://192.168.1.14:5000/sensor_data");
     http.addHeader("Content-Type", "application/json");
 
     // Select channel for MPU6050 and read data
