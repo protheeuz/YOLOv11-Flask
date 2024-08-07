@@ -193,7 +193,7 @@ def health_check_modal():
 def get_sensor_data(sensor):
     try:
         esp32_ip = '192.168.1.16'
-        response = requests.get(f'http://{esp32_ip}/sensor_data/{sensor}')
+        response = requests.get(f'http://{esp32_ip}/get_sensor_data/{sensor}')
         data = response.json()
         if response.status_code == 200:
             return jsonify({'status': 'sukses', 'value': data['value']})
@@ -251,14 +251,14 @@ def request_sensor_data():
             connection = get_db()
             cursor = connection.cursor()
             cursor.execute(f"""
-                INSERT INTO sensor_data (user_id, {sensor})
-                VALUES (%s, %s)
-                ON DUPLICATE KEY UPDATE {sensor} = %s
-            """, (user_id, data['value'], data['value']))
+                INSERT INTO sensor_data (user_id, heart_rate, oxygen_level)
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE heart_rate = %s, oxygen_level = %s
+            """, (user_id, data['heart_rate'], data['oxygen_level'], data['heart_rate'], data['oxygen_level']))
             connection.commit()
             cursor.close()
 
-            return jsonify({'status': 'sukses', 'value': data['value']})
+            return jsonify({'status': 'sukses', 'value': data['heart_rate']})
         else:
             return jsonify({'status': 'gagal', 'message': data['message']}), 400
     except Exception as e:
@@ -354,21 +354,3 @@ def employee_list():
     cursor.close()
     
     return render_template('home/employee_list.html', employees=employees)
-
-@main_bp.route('/send_lcd_data', methods=['POST'])
-@login_required
-def send_lcd_data():
-    step = request.json.get('step')
-    value = request.json.get('value')
-    esp32_ip = '192.168.1.16'
-
-    try:
-        response = requests.post(f'http://{esp32_ip}/update_lcd', json={'step': step, 'value': value})
-        data = response.json()
-
-        if response.status_code == 200 and data['status'] == 'sukses':
-            return jsonify({'status': 'sukses'})
-        else:
-            return jsonify({'status': 'gagal', 'message': data.get('message', 'Unknown error')}), 400
-    except Exception as e:
-        return jsonify({'status': 'gagal', 'message': str(e)}), 500

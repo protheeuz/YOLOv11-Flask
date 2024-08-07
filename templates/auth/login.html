@@ -183,30 +183,24 @@
             <div class="modal-body">
                 <p>PENGECEKAN KESEHATAN</p>
                 <div id="health-check-step-1">
-                    <p>DETAK JANTUNG:</p>
+                    <p>DETAK JANTUNG & LEVEL OKSIGEN:</p>
                     <p>Tempatkan jari Anda pada infra-merah yang ada pada sensor, tahan beberapa saat sampai mendapatkan hasil.</p>
-                    <button type="button" class="btn btn-primary" id="startHeartRateCheck">Cek sekarang</button>
-                    <div id="heartRateValue"></div>
+                    <button type="button" class="btn btn-primary" id="startHeartRateAndOxygenCheck">Cek sekarang</button>
+                    <div id="heartRateAndOxygenValue"></div>
                 </div>
                 <div id="health-check-step-2" style="display: none;">
-                    <p>LEVEL OKSIGEN:</p>
-                    <p>Tempatkan jari Anda pada infra-merah yang ada pada sensor, tahan beberapa saat sampai mendapatkan hasil.</p>
-                    <button type="button" class="btn btn-primary" id="startOxygenLevelCheck">Cek sekarang</button>
-                    <div id="oxygenLevelValue"></div>
-                </div>
-                <div id="health-check-step-3" style="display: none;">
                     <p>TEMPERATUR:</p>
                     <p>Pastikan sensor temperatur berada di lingkungan yang stabil, tahan beberapa saat sampai mendapatkan hasil.</p>
                     <button type="button" class="btn btn-primary" id="startTemperatureCheck">Cek sekarang</button>
                     <div id="temperatureValue"></div>
                 </div>
-                <div id="health-check-step-4" style="display: none;">
+                <div id="health-check-step-3" style="display: none;">
                     <p>LEVEL AKTIVITAS:</p>
                     <p>Lakukan beberapa gerakan ringan seperti menggoyangkan tangan atau kaki untuk mengukur aktivitas Anda.</p>
                     <button type="button" class="btn btn-primary" id="startActivityLevelCheck">Cek sekarang</button>
                     <div id="activityLevelValue"></div>
                 </div>
-                <div id="health-check-step-5" style="display: none;">
+                <div id="health-check-step-4" style="display: none;">
                     <p>ECG:</p>
                     <p>Pastikan jari Anda menyentuh elektroda dengan baik, tahan beberapa saat sampai mendapatkan hasil.</p>
                     <button type="button" class="btn btn-primary" id="startECGCheck">Cek sekarang</button>
@@ -426,7 +420,7 @@
             const button = document.getElementById(`start${step}Check`);
             const valueDiv = document.getElementById(`${step}Value`);
             button.disabled = true;
-            let timeLeft = 60;
+            let timeLeft = 10; // Ubah dari 60 detik menjadi 10 detik
             const timer = setInterval(() => {
                 button.innerText = `Mengambil data (${timeLeft--}s)`;
                 if (timeLeft < 0) {
@@ -442,7 +436,6 @@
                     .then(data => {
                         if (data.status === 'sukses') {
                             valueDiv.innerText = `${step}: ` + data.value;
-                            sendToLCD(step, data.value); // Update LCD here
                             if (currentStep < 5) {
                                 currentStep++;
                                 document.getElementById(`health-check-step-${currentStep - 1}`).style.display = 'none';
@@ -451,12 +444,12 @@
                                 document.getElementById('submitHealthCheck').style.display = 'block';
                             }
                         } else {
-                            valueDiv.innerText = `Gagal: ` + data.message;
+                            valueDiv.innerText = 'Gagal: ' + data.message;
                         }
                     })
                     .catch(error => {
                         console.error('Error:', error);
-                        valueDiv.innerText = `Gagal: ` + error.message;
+                        valueDiv.innerText = 'Gagal: ' + error.message;
                     })
                     .finally(() => {
                         button.disabled = false;
@@ -466,90 +459,8 @@
             }, 1000);
         }
 
-        function startECGCheck() {
-            const button = document.getElementById('startECGCheck');
-            const valueDiv = document.getElementById('ecgValue');
-            button.disabled = true;
-            let ecgData = [];
-            let timeLeft = 60;
-            const timer = setInterval(() => {
-                button.innerText = `Mengambil data (${timeLeft--}s)`;
-                fetch('/request_sensor_data', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ esp32_ip: esp32_ip, sensor: 'ecg' })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'sukses') {
-                        ecgData.push(data.value);
-                    }
-                })
-                .catch(error => console.error('Error:', error));
-
-                if (timeLeft < 0) {
-                    clearInterval(timer);
-                    valueDiv.innerText = `ECG data collected for 60 seconds.`;
-                    // Send ECG data to the server
-                    fetch('/store_ecg_data', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ ecg_data: ecgData })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'sukses') {
-                            sendToLCD('ECG', 'Data terkumpul'); // Update LCD here
-                            if (currentStep < 5) {
-                                currentStep++;
-                                document.getElementById(`health-check-step-${currentStep - 1}`).style.display = 'none';
-                                document.getElementById(`health-check-step-${currentStep}`).style.display = 'block';
-                            } else {
-                                document.getElementById('submitHealthCheck').style.display = 'block';
-                            }
-                        } else {
-                            valueDiv.innerText = `Gagal: ` + data.message;
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        valueDiv.innerText = `Gagal: ` + error.message;
-                    })
-                    .finally(() => {
-                        button.disabled = false;
-                        button.innerText = 'Cek sekarang';
-                    });
-                }
-            }, 1000);
-        }
-
-        function sendToLCD(step, value) {
-            fetch('/send_lcd_data', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ step: step, value: value })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status !== 'sukses') {
-                    console.error('Gagal mengirim data ke LCD');
-                }
-            })
-            .catch(error => console.error('Error:', error));
-        }
-
-        document.getElementById('startHeartRateCheck').addEventListener('click', function() {
-            startCheck('HeartRate', 'heart_rate');
-        });
-
-        document.getElementById('startOxygenLevelCheck').addEventListener('click', function() {
-            startCheck('OxygenLevel', 'oxygen_level');
+        document.getElementById('startHeartRateAndOxygenCheck').addEventListener('click', function() {
+            startCheck('HeartRateAndOxygen', 'heart_rate_and_oxygen');
         });
 
         document.getElementById('startTemperatureCheck').addEventListener('click', function() {
@@ -561,15 +472,16 @@
         });
 
         document.getElementById('startECGCheck').addEventListener('click', function() {
-            startECGCheck();
+            startCheck('ECG', 'ecg');
         });
 
         document.getElementById('submitHealthCheck').addEventListener('click', function() {
             const formData = {
-                heart_rate: document.getElementById('heartRateValue').innerText.split(': ')[1],
-                oxygen_level: document.getElementById('oxygenLevelValue').innerText.split(': ')[1],
+                heart_rate: document.getElementById('heartRateAndOxygenValue').innerText.split(': ')[1],
+                oxygen_level: document.getElementById('heartRateAndOxygenValue').innerText.split(': ')[1],
                 temperature: document.getElementById('temperatureValue').innerText.split(': ')[1],
-                activity_level: document.getElementById('activityLevelValue').innerText.split(': ')[1]
+                activity_level: document.getElementById('activityLevelValue').innerText.split(': ')[1],
+                ecg_value: document.getElementById('ecgValue').innerText.split(': ')[1]
             };
             fetch('{{ url_for("main.sensor_data") }}', {
                 method: "POST",
