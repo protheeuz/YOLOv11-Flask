@@ -102,6 +102,10 @@
         background-color: #333;
         color: white;
     }
+    #retryECGCheck {
+        display: none; /* Awalnya disembunyikan */
+        margin-top: 10px;
+    }
 </style>
 {% endblock stylesheets %}
 
@@ -132,7 +136,7 @@
                     <div class="input-group mb-4">
                         <input type="password" class="form-control" id="password" name="password" placeholder="Kata Sandi" required>
                     </div>
-                    <input type="hidden" name="esp32_ip" value="192.168.1.16"> <!-- Tambahkan ini -->
+                    <input type="hidden" name="esp32_ip" value="192.168.20.184"> <!-- Tambahkan ini -->
                     <div class="d-flex justify-content-end mb-4">
                         <a href="{{ url_for('auth.forgot_password') }}" class="btn btn-link p-0">Lupa Password?</a>
                     </div>
@@ -254,6 +258,8 @@
                         .then(data => {
                             if (data.status === 'sukses') {
                                 if (data.user_id) {
+                                    // Kirim user_id ke ESP32 setelah login sukses
+                                    sendUserIdToESP32(data.user_id);
                                     checkHealthStatus(data.user_id, 'admin'); // Pass role to checkHealthStatus
                                 } else {
                                     alert('User ID tidak ditemukan.');
@@ -322,6 +328,8 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'sukses') {
+                    // Kirim user_id ke ESP32 setelah login sukses
+                    sendUserIdToESP32(data.user_id);
                     checkHealthStatus(data.user_id, 'admin'); // Pass role to checkHealthStatus
                 } else if (data.status === 'health_check_required') {
                     $('#healthCheckModal').modal('show');
@@ -365,7 +373,7 @@
     }
 
     function sendUserIdToESP32(user_id) {
-        const esp32_ip = '192.168.1.16'; 
+        const esp32_ip = '192.168.20.184'; 
         fetch('/auth/send_user_id', {
             method: 'POST',
             headers: {
@@ -385,7 +393,7 @@
     }
 
     function sendSessionTokenToESP32(session_token) {
-        const esp32_ip = '192.168.1.16'; 
+        const esp32_ip = '192.168.20.184'; 
         fetch('/auth/send_session_token', {
             method: 'POST',
             headers: {
@@ -414,6 +422,8 @@
         .then(response => response.json())
         .then(data => {
             if (data.status === 'sukses') {
+                // Kirim user_id ke ESP32 setelah login sukses
+                sendUserIdToESP32(data.user_id);
                 checkHealthStatus(data.user_id, 'admin'); // Pass role to checkHealthStatus
             } else if (data.status === 'health_check_required') {
                 $('#healthCheckModal').modal('show');
@@ -427,7 +437,7 @@
 
     document.addEventListener('DOMContentLoaded', (event) => {
         let currentStep = 1;
-        const esp32_ip = '192.168.1.16'; // IP Address ESP32
+        const esp32_ip = '192.168.20.184'; // IP Address ESP32
 
         function startCheck(step, sensor) {
             const button = document.getElementById(`start${step}Check`);
@@ -523,7 +533,7 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'sukses') {
-                    ecgStatus.innerText = 'Data ECG berhasil dikumpulkan';
+                    ecgStatus.innerText = 'Pengumpulan data ECG berhasil dimulai.';
                     nextButton.style.display = 'block';
                 } else {
                     ecgStatus.innerText = 'Gagal: ' + data.message;

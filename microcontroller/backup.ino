@@ -11,17 +11,18 @@
 #include <LiquidCrystal_I2C.h>
 #include "spo2_algorithm.h"
 #include "esp_task_wdt.h"
+#include <Ticker.h>
 
 // WiFi Credentials
-const char* ssid = "Fathermustache";
-const char* password = "samsinis05";
+const char *ssid = "MathtechStudio";
+const char *password = "Bellaciao13";
 
 // Create instances for sensors
 Adafruit_MPU6050 mpu;
 MAX30105 particleSensor;
-OneWire oneWire(18); // DS18B20 data pin
+OneWire oneWire(18);  // DS18B20 data pin
 DallasTemperature sensors(&oneWire);
-LiquidCrystal_I2C lcd(0x27, 20, 4); // I2C address 0x27 for 20x4 LCD
+LiquidCrystal_I2C lcd(0x27, 20, 4);  // I2C address 0x27 for 20x4 LCD
 
 // Define pins
 const int AD8232_OUTPUT = 32;
@@ -102,6 +103,13 @@ void tcaSelect(uint8_t i) {
 
 // WiFi and Server setup
 AsyncWebServer server(80);
+Ticker ecgTicker;
+bool ecgCollecting = false;
+unsigned long startMillis;
+unsigned long endMillis;
+const int sampleInterval = 100;    // 100ms
+const int sampleDuration = 20000;  // 20 seconds
+std::vector<int> ecgData;
 
 void setup() {
   Serial.begin(115200);
@@ -118,12 +126,13 @@ void setup() {
 
   // Initialize I2C
   Wire.begin();
-  
+
   // Initialize MPU6050
   tcaSelect(1);
   if (!mpu.begin(0x68)) {
     Serial.println("Tidak dapat menemukan sensor MPU6050 di channel 1!");
-    while (1);
+    while (1)
+      ;
   }
   Serial.println("MPU6050 berhasil diinisialisasi di channel 1!");
 
@@ -131,11 +140,12 @@ void setup() {
   tcaSelect(4);
   if (!particleSensor.begin()) {
     Serial.println("Tidak dapat menemukan sensor MAX30105 di channel 4!");
-    while (1);
+    while (1)
+      ;
   }
   particleSensor.setup();
-  particleSensor.setPulseAmplitudeRed(0x0A); // Turn on RED LED
-  particleSensor.setPulseAmplitudeGreen(0);  // Turn off GREEN LED
+  particleSensor.setPulseAmplitudeRed(0x0A);  // Turn on RED LED
+  particleSensor.setPulseAmplitudeGreen(0);   // Turn off GREEN LED
   Serial.println("MAX30105 berhasil diinisialisasi di channel 4!");
 
   // Initialize DS18B20
@@ -151,46 +161,47 @@ void setup() {
   tcaSelect(0);
   lcd.init();
   lcd.backlight();
-  
+
   // Buat karakter khusus
   lcd.createChar(0, heart);
   lcd.createChar(1, oxygen);
   lcd.createChar(2, temp);
   lcd.createChar(3, activity);
   lcd.createChar(4, ecg);
-  
+
   lcd.setCursor(0, 0);
   lcd.print(" PT. Prima Feedmill");
 
   // HTTP server routes
-  server.on("/set_user_id", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-    Serial.print("Received data: ");
-    Serial.write(data, len);
-    Serial.println();
+  server.on(
+    "/set_user_id", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+      Serial.print("Received data: ");
+      Serial.write(data, len);
+      Serial.println();
 
-    DynamicJsonDocument doc(200);
-    DeserializationError error = deserializeJson(doc, data);
-    
-    if (error) {
-      Serial.print("deserializeJson() failed: ");
-      Serial.println(error.c_str());
-      request->send(400, "application/json", "{\"status\":\"gagal\", \"message\":\"Deserialization error\"}");
-      return;
-    }
+      DynamicJsonDocument doc(200);
+      DeserializationError error = deserializeJson(doc, data);
 
-    if (!doc.containsKey("user_id")) {
-      Serial.println("No user_id key in JSON");
-      request->send(400, "application/json", "{\"status\":\"gagal\", \"message\":\"No user_id key in JSON\"}");
-      return;
-    }
+      if (error) {
+        Serial.print("deserializeJson() failed: ");
+        Serial.println(error.c_str());
+        request->send(400, "application/json", "{\"status\":\"gagal\", \"message\":\"Deserialization error\"}");
+        return;
+      }
 
-    user_id = doc["user_id"];
-    Serial.print("User ID set to: ");
-    Serial.println(user_id);
-    request->send(200, "application/json", "{\"status\":\"sukses\"}");
-  });
+      if (!doc.containsKey("user_id")) {
+        Serial.println("No user_id key in JSON");
+        request->send(400, "application/json", "{\"status\":\"gagal\", \"message\":\"No user_id key in JSON\"}");
+        return;
+      }
 
-  server.on("/get_sensor_data/heart_rate", HTTP_GET, [](AsyncWebServerRequest *request){
+      user_id = doc["user_id"];
+      Serial.print("User ID set to: ");
+      Serial.println(user_id);
+      request->send(200, "application/json", "{\"status\":\"sukses\"}");
+    });
+
+  server.on("/get_sensor_data/heart_rate", HTTP_GET, [](AsyncWebServerRequest *request) {
     tcaSelect(4);
     uint32_t irBuffer[100];
     uint32_t redBuffer[100];
@@ -201,11 +212,11 @@ void setup() {
       redBuffer[i] = particleSensor.getRed();
       irBuffer[i] = particleSensor.getIR();
       particleSensor.nextSample();
-      esp_task_wdt_reset(); // Reset watchdog timer
+      esp_task_wdt_reset();  // Reset watchdog timer
     }
     int8_t validSPO2;
     int8_t validHeartRate;
-    maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, (int32_t*)&spo2, &validSPO2, (int32_t*)&heartRate, &validHeartRate);
+    maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, (int32_t *)&spo2, &validSPO2, (int32_t *)&heartRate, &validHeartRate);
     if (!validHeartRate) {
       request->send(500, "application/json", "{\"status\":\"gagal\", \"message\":\"Invalid heart rate data\"}");
       return;
@@ -214,7 +225,7 @@ void setup() {
     request->send(200, "application/json", jsonResponse);
   });
 
-  server.on("/get_sensor_data/oxygen_level", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/get_sensor_data/oxygen_level", HTTP_GET, [](AsyncWebServerRequest *request) {
     tcaSelect(4);
     uint32_t irBuffer[100];
     uint32_t redBuffer[100];
@@ -225,11 +236,11 @@ void setup() {
       redBuffer[i] = particleSensor.getRed();
       irBuffer[i] = particleSensor.getIR();
       particleSensor.nextSample();
-      esp_task_wdt_reset(); // Reset watchdog timer
+      esp_task_wdt_reset();  // Reset watchdog timer
     }
     int8_t validSPO2;
     int8_t validHeartRate;
-    maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, (int32_t*)&spo2, &validSPO2, (int32_t*)&heartRate, &validHeartRate);
+    maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, (int32_t *)&spo2, &validSPO2, (int32_t *)&heartRate, &validHeartRate);
     if (!validSPO2) {
       request->send(500, "application/json", "{\"status\":\"gagal\", \"message\":\"Invalid oxygen level data\"}");
       return;
@@ -238,7 +249,7 @@ void setup() {
     request->send(200, "application/json", jsonResponse);
   });
 
-  server.on("/get_sensor_data/temperature", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/get_sensor_data/temperature", HTTP_GET, [](AsyncWebServerRequest *request) {
     sensors.requestTemperatures();
     temperature = sensors.getTempCByIndex(0);
     if (temperature == -127.00) {
@@ -249,7 +260,7 @@ void setup() {
     request->send(200, "application/json", jsonResponse);
   });
 
-  server.on("/get_sensor_data/activity_level", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/get_sensor_data/activity_level", HTTP_GET, [](AsyncWebServerRequest *request) {
     tcaSelect(1);
     sensors_event_t accel, gyro;
     mpu.getAccelerometerSensor()->getEvent(&accel);
@@ -259,14 +270,30 @@ void setup() {
     request->send(200, "application/json", jsonResponse);
   });
 
-  server.on("/get_sensor_data/ecg", HTTP_GET, [](AsyncWebServerRequest *request){
-    ecg_value = analogRead(AD8232_OUTPUT);
-    if (ecg_value == 4095) {
-      request->send(500, "application/json", "{\"status\":\"gagal\", \"message\":\"Invalid ECG data\"}");
-      return;
+  server.on("/get_sensor_data/ecg", HTTP_GET, [](AsyncWebServerRequest *request) {
+    if (!ecgCollecting) {
+      ecgData.clear();
+      ecgCollecting = true;
+      startMillis = millis();
+      endMillis = startMillis + sampleDuration;
+      ecgTicker.attach_ms(sampleInterval, collectECG);
+      request->send(200, "application/json", "{\"status\":\"sukses\", \"message\":\"ECG collection started\"}");
+    } else if (!ecgCollecting && !ecgData.empty()) {
+      DynamicJsonDocument doc(4096);
+      doc["status"] = "sukses";
+      JsonArray data = doc.createNestedArray("value");
+
+      for (int value : ecgData) {
+        data.add(value);
+      }
+
+      String jsonResponse;
+      serializeJson(doc, jsonResponse);
+      request->send(200, "application/json", jsonResponse);
+      ecgData.clear();  // Clear data after sending
+    } else {
+      request->send(400, "application/json", "{\"status\":\"gagal\", \"message\":\"ECG collection already in progress or no data\"}");
     }
-    String jsonResponse = "{\"status\":\"sukses\",\"value\":" + String(ecg_value) + "}";
-    request->send(200, "application/json", jsonResponse);
   });
 
   server.begin();
@@ -305,5 +332,53 @@ void loop() {
   lcd.print(": ");
   lcd.print(ecg_value);
 
-  delay(10000); // Delay for 10 seconds
+  delay(10000);          // Delay for 10 seconds
+  esp_task_wdt_reset();  // Reset watchdog timer again after delay
+}
+
+void collectECG() {
+  ecg_value = analogRead(AD8232_OUTPUT);
+  if (ecg_value < 4095) {  // Hanya simpan data yang valid
+    ecgData.push_back(ecg_value);
+  }
+  if (millis() >= endMillis) {
+    ecgTicker.detach();
+    ecgCollecting = false;
+    sendECGData();
+  }
+}
+
+void sendECGData() {
+  if (user_id == -1) {
+    Serial.println("Error: Invalid user_id. Data not sent.");
+    return;
+  }
+
+  DynamicJsonDocument doc(4096);
+  doc["status"] = "sukses";
+  JsonArray data = doc.createNestedArray("value");
+
+  for (int value : ecgData) {
+    data.add(value);
+  }
+
+  String jsonResponse;
+  serializeJson(doc, jsonResponse);
+
+  HTTPClient http;
+  http.begin("http://192.168.20.136:5000/sensor_data");
+  http.addHeader("Content-Type", "application/json");
+
+  int httpResponseCode = http.POST(jsonResponse);
+
+  if (httpResponseCode > 0) {
+    String response = http.getString();
+    Serial.println(httpResponseCode);
+    Serial.println(response);
+  } else {
+    Serial.print("Error on sending POST: ");
+    Serial.println(httpResponseCode);
+  }
+
+  http.end();
 }

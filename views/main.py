@@ -11,10 +11,37 @@ import mysql.connector
 
 main_bp = Blueprint('main', __name__)
 
+def get_health_check_status(user_id):
+    connection = get_db()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT 
+            MAX(CASE WHEN heart_rate IS NOT NULL THEN 1 ELSE 0 END) AS heart_rate_done,
+            MAX(CASE WHEN oxygen_level IS NOT NULL THEN 1 ELSE 0 END) AS oxygen_level_done,
+            MAX(CASE WHEN temperature IS NOT NULL THEN 1 ELSE 0 END) AS temperature_done,
+            MAX(CASE WHEN activity_level IS NOT NULL THEN 1 ELSE 0 END) AS activity_level_done,
+            MAX(CASE WHEN ecg_value IS NOT NULL THEN 1 ELSE 0 END) AS ecg_done
+        FROM sensor_data
+        WHERE user_id = %s AND DATE(timestamp) = CURDATE()
+    """, (user_id,))
+    health_data = cursor.fetchone()
+
+    cursor.close()
+
+    session['health_status'] = {
+        'heart_rate': health_data[0] == 1,
+        'oxygen_level': health_data[1] == 1,
+        'temperature': health_data[2] == 1,
+        'activity_level': health_data[3] == 1,
+        'ecg': health_data[4] == 1
+    }
+    return session['health_status']
+
 @main_bp.route('/')
 @login_required
 def index():
-    user_id = request.args.get('user_id')
+    user_id = request.args.get('user_id') or current_user.id
     connection = get_db()
     cursor = connection.cursor()
 
@@ -97,6 +124,18 @@ def index():
                                weekly_health_checks=weekly_health_checks,
                                all_health_checks=all_health_checks)
     else:
+        # Cek apakah pengecekan kesehatan sudah selesai hari ini
+        cursor.execute("""
+            SELECT completed FROM health_checks
+            WHERE user_id = %s AND check_date = CURDATE()
+        """, (current_user.id,))
+        health_check = cursor.fetchone()
+        
+        if health_check and health_check[0]:  # Pengecekan sudah selesai
+            return render_template('home/index_karyawan.html')
+
+        # Jika belum selesai, lanjutkan dengan pengecekan kesehatan
+        health_status = get_health_check_status(current_user.id)
         cursor.execute("""
             SELECT heart_rate, oxygen_level, temperature, activity_level 
             FROM sensor_data
@@ -119,7 +158,8 @@ def index():
         return render_template('home/index_karyawan.html',
                                latest_health_data=latest_health_data,
                                ecg_values=ecg_values,
-                               ecg_timestamps=ecg_timestamps)
+                               ecg_timestamps=ecg_timestamps,
+                               health_status=health_status)
 
 @main_bp.route('/notifications')
 @login_required
@@ -187,13 +227,14 @@ def health_check():
 @main_bp.route('/health_check_modal')
 @login_required
 def health_check_modal():
-    return render_template('health_check_modal.html')
+    health_status = get_health_check_status(current_user.id)
+    return render_template('health_check_modal.html', health_status=health_status)
 
 @main_bp.route('/get_sensor_data/<sensor>', methods=['GET'])
 @login_required
 def get_sensor_data(sensor):
     try:
-        esp32_ip = '192.168.1.16'
+        esp32_ip = '192.168.20.184'
         response = requests.get(f'http://{esp32_ip}/get_sensor_data/{sensor}')
         data = response.json()
         if response.status_code == 200:
@@ -221,17 +262,21 @@ def sensor_data():
     cursor = connection.cursor()
 
     try:
+        # Simpan data heart_rate, oxygen_level, temperature, dan activity_level
         cursor.execute("""
             INSERT INTO sensor_data (user_id, heart_rate, oxygen_level, temperature, activity_level)
             VALUES (%s, %s, %s, %s, %s)
         """, (user_id, heart_rate, oxygen_level, temperature, activity_level))
 
+        # Simpan data ECG jika ada
         if ecg_values:
             for ecg_value in ecg_values:
-                cursor.execute("""
-                    INSERT INTO ecg_data (user_id, ecg_value, timestamp)
-                    VALUES (%s, %s, NOW())
-                """, (user_id, ecg_value))
+                # Abaikan nilai ECG yang tidak valid (contoh: 4095)
+                if ecg_value != 4095:
+                    cursor.execute("""
+                        INSERT INTO ecg_data (user_id, ecg_value, timestamp)
+                        VALUES (%s, %s, NOW())
+                    """, (user_id, ecg_value))
 
         check_date = datetime.now().date()
         cursor.execute("UPDATE health_checks SET completed = TRUE WHERE user_id = %s AND check_date = %s", (user_id, check_date))
@@ -256,6 +301,10 @@ def request_sensor_data():
         data = response.json()
 
         if response.status_code == 200:
+            if 'value' not in data:
+                current_app.logger.error(f"Key 'value' not found in response: {data}")
+                return jsonify({'status': 'gagal', 'message': 'Data not available yet'}), 500
+
             connection = get_db()
             cursor = connection.cursor()
             cursor.execute(f"""
@@ -269,6 +318,7 @@ def request_sensor_data():
         else:
             return jsonify({'status': 'gagal', 'message': data['message']}), 400
     except Exception as e:
+        current_app.logger.error(f"Error processing sensor data: {str(e)}")
         return jsonify({'status': 'gagal', 'message': str(e)}), 500
 
 @main_bp.route('/poll_health_check_status', methods=['GET'])
@@ -361,3 +411,40 @@ def employee_list():
     cursor.close()
 
     return render_template('home/employee_list.html', employees=employees)
+
+# Tambahan untuk pengiriman user_id dan session_token ke ESP32
+@main_bp.route('/auth/send_user_id', methods=['POST'])
+@login_required
+def send_user_id():
+    user_id = request.json.get('user_id')
+    esp32_ip = request.json.get('esp32_ip')
+
+    if not user_id or not esp32_ip:
+        return jsonify({'status': 'gagal', 'message': 'Invalid user_id or esp32_ip'})
+
+    try:
+        response = requests.post(f'http://{esp32_ip}/set_user_id', json={'user_id': user_id})
+        if response.status_code == 200:
+            return jsonify({'status': 'sukses'})
+        else:
+            return jsonify({'status': 'gagal', 'message': 'Failed to send User ID to ESP32'})
+    except Exception as e:
+        return jsonify({'status': 'gagal', 'message': str(e)}), 500
+
+@main_bp.route('/auth/send_session_token', methods=['POST'])
+@login_required
+def send_session_token():
+    session_token = request.json.get('session_token')
+    esp32_ip = request.json.get('esp32_ip')
+
+    if not session_token or not esp32_ip:
+        return jsonify({'status': 'gagal', 'message': 'Invalid session_token or esp32_ip'})
+
+    try:
+        response = requests.post(f'http://{esp32_ip}/set_session_token', json={'session_token': session_token})
+        if response.status_code == 200:
+            return jsonify({'status': 'sukses'})
+        else:
+            return jsonify({'status': 'gagal', 'message': 'Failed to send Session Token to ESP32'})
+    except Exception as e:
+        return jsonify({'status': 'gagal', 'message': str(e)}), 500
