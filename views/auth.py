@@ -24,7 +24,6 @@ from views.main import get_health_check_status
 
 auth_bp = Blueprint('auth', __name__)
 
-
 def generate_unique_code():
     return ''.join(random.choices(string.digits, k=4))
 

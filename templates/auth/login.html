@@ -452,6 +452,8 @@
             button.innerText = `Mengambil data (${timeLeft--}s)`;
             if (timeLeft < 0) {
                 clearInterval(timer);
+                button.innerText = 'Mengambil Data...';
+
                 fetch('/request_sensor_data', {
                     method: 'POST',
                     headers: {
@@ -476,11 +478,15 @@
                 })
                 .finally(() => {
                     button.disabled = false;
-                    button.innerText = 'Cek sekarang';
+                    button.innerText = 'Cek sekarang';  // Reset the button text so the user can try again
                 });
             }
         }, 1000);
     }
+
+    retryButton.addEventListener('click', function() {
+        startCheck(step, sensor);
+    });
 
     document.getElementById('startHeartRateCheck').addEventListener('click', function() {
         startCheck('HeartRate', 'heart_rate');
