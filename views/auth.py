@@ -20,6 +20,8 @@ import random
 import string
 import logging
 
+from views.main import get_health_check_status
+
 auth_bp = Blueprint('auth', __name__)
 
 
@@ -204,7 +206,7 @@ def login():
     if request.method == 'POST':
         nik = request.form['nik']
         password = request.form['password']
-        esp32_ip = request.form.get('esp32_ip', '192.168.20.184')  # Dapatkan IP ESP32 dari form
+        esp32_ip = request.form.get('esp32_ip', '192.168.20.184')
 
         connection = get_db()
         cursor = connection.cursor()
@@ -225,7 +227,9 @@ def login():
                 cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_data[0],))
                 connection.commit()
 
-                # Skip health check if the user is an admin
+                # Simpan status kesehatan di sesi
+                session['health_status'] = get_health_check_status(user_data[0])
+
                 if user_data[2] == 'admin':
                     return jsonify({"status": "sukses", "user_id": user_data[0]})
                 
@@ -247,7 +251,8 @@ def login():
         cursor.close()
         return jsonify({"status": "gagal", "message": "NIK atau password salah"})
                                                                                                                                         
-    return render_template('auth/login.html')
+    health_status = session.get('health_status', {})
+    return render_template('auth/login.html', health_status=health_status)
 
 @auth_bp.route('/login_face', methods=['POST'])
 def login_face():
@@ -295,6 +300,9 @@ def login_face():
             session['user_id'] = user_id
             session['session_token'] = generate_session_token()
             current_app.logger.debug(f'Session after login (face): {session.items()}')
+
+            # Simpan status kesehatan di sesi
+            session['health_status'] = get_health_check_status(user_id)
 
             # Skip health check if the user is an admin
             if user_role == 'admin':
@@ -349,6 +357,9 @@ def login_qr():
             session['user_id'] = user_id
             session['session_token'] = generate_session_token()
             current_app.logger.debug(f'Session after login (QR): {session.items()}')
+
+            # Simpan status kesehatan di sesi
+            session['health_status'] = get_health_check_status(user_id)
 
             # Skip health check if the user is an admin
             if user_role == 'admin':

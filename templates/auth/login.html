@@ -103,7 +103,7 @@
         color: white;
     }
     #retryECGCheck {
-        display: none; /* Awalnya disembunyikan */
+        display: none;
         margin-top: 10px;
     }
 </style>
@@ -136,7 +136,7 @@
                     <div class="input-group mb-4">
                         <input type="password" class="form-control" id="password" name="password" placeholder="Kata Sandi" required>
                     </div>
-                    <input type="hidden" name="esp32_ip" value="192.168.20.184"> <!-- Tambahkan ini -->
+                    <input type="hidden" name="esp32_ip" value="192.168.20.184">
                     <div class="d-flex justify-content-end mb-4">
                         <a href="{{ url_for('auth.forgot_password') }}" class="btn btn-link p-0">Lupa Password?</a>
                     </div>
@@ -161,7 +161,6 @@
     </div>
 </div>
 
-<!-- Modal untuk login wajah -->
 <div id="face-login-modal">
     <div id="face-login-content">
         <span id="close-modal-login">&times;</span>
@@ -175,7 +174,6 @@
     </div>
 </div>
 
-<!-- Modal untuk pengecekan kesehatan -->
 <div class="modal fade" id="healthCheckModal" tabindex="-1" role="dialog" aria-labelledby="healthCheckModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -231,7 +229,6 @@
         </div>
     </div>
 </div>
-
 {% endblock content %}
 
 {% block javascripts %}
@@ -245,7 +242,6 @@
                 .then(function (stream) {
                     video.srcObject = stream;
                     video.play();
-                    // Mulai login wajah setelah beberapa detik untuk memastikan video berjalan
                     setTimeout(function() {
                         document.getElementById('loading-login').style.display = 'block';
                         fetch('{{ url_for("auth.login_face") }}', {
@@ -258,9 +254,8 @@
                         .then(data => {
                             if (data.status === 'sukses') {
                                 if (data.user_id) {
-                                    // Kirim user_id ke ESP32 setelah login sukses
                                     sendUserIdToESP32(data.user_id);
-                                    checkHealthStatus(data.user_id, 'admin'); // Pass role to checkHealthStatus
+                                    checkHealthStatus(data.user_id, 'admin');
                                 } else {
                                     alert('User ID tidak ditemukan.');
                                 }
@@ -328,9 +323,8 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'sukses') {
-                    // Kirim user_id ke ESP32 setelah login sukses
                     sendUserIdToESP32(data.user_id);
-                    checkHealthStatus(data.user_id, 'admin'); // Pass role to checkHealthStatus
+                    checkHealthStatus(data.user_id, 'admin');
                 } else if (data.status === 'health_check_required') {
                     $('#healthCheckModal').modal('show');
                 } else {
@@ -343,17 +337,14 @@
         }
     });
 
-    // Tutup modal login wajah
     document.getElementById('close-modal-login').addEventListener('click', function() {
         document.getElementById('face-login-modal').style.display = 'none';
     });
 
-    // Aktifkan tema gelap secara default
     document.addEventListener('DOMContentLoaded', (event) => {
         document.body.classList.add('dark');
     });
 
-    // Tambahkan logika modal pengecekan kesehatan
     function checkHealthStatus(user_id, role) {
         if (role === 'admin') {
             window.location.href = '{{ url_for("main.index") }}?user_id=' + user_id;
@@ -367,6 +358,7 @@
                 window.location.href = '{{ url_for("main.index") }}?user_id=' + user_id;
             } else {
                 $('#healthCheckModal').modal('show');
+                updateHealthCheckSteps();
             }
         })
         .catch(error => console.error('Error:', error));
@@ -392,26 +384,6 @@
         .catch(error => console.error('Error:', error));
     }
 
-    function sendSessionTokenToESP32(session_token) {
-        const esp32_ip = '192.168.20.184'; 
-        fetch('/auth/send_session_token', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ esp32_ip: esp32_ip, session_token: session_token })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'sukses') {
-                console.log('Session Token berhasil dikirim ke ESP32');
-            } else {
-                console.error('Gagal mengirim Session Token ke ESP32');
-            }
-        })
-        .catch(error => console.error('Error:', error));
-    }
-
     document.getElementById('loginForm').addEventListener('submit', function(event) {
         event.preventDefault();
         const formData = new FormData(this);
@@ -422,11 +394,11 @@
         .then(response => response.json())
         .then(data => {
             if (data.status === 'sukses') {
-                // Kirim user_id ke ESP32 setelah login sukses
                 sendUserIdToESP32(data.user_id);
-                checkHealthStatus(data.user_id, 'admin'); // Pass role to checkHealthStatus
+                checkHealthStatus(data.user_id, 'admin');
             } else if (data.status === 'health_check_required') {
                 $('#healthCheckModal').modal('show');
+                updateHealthCheckSteps();
             } else {
                 document.getElementById('error-message').innerText = data.message;
                 document.getElementById('error-message').style.display = 'block';
@@ -435,182 +407,209 @@
         .catch(error => console.error('Error:', error));
     });
 
-    document.addEventListener('DOMContentLoaded', (event) => {
-        let currentStep = 1;
-        const esp32_ip = '192.168.20.184'; // IP Address ESP32
-
-        function startCheck(step, sensor) {
-            const button = document.getElementById(`start${step}Check`);
-            const retryButton = document.getElementById(`retry${step}Check`);
-            const valueSpan = document.getElementById(`${step}Value`);
-            const nextButton = document.getElementById(`nextStep${currentStep}`);
-            button.disabled = true;
-            retryButton.style.display = 'none';
-            let timeLeft = 10; // Ubah dari 60 detik menjadi 10 detik
-            const timer = setInterval(() => {
-                button.innerText = `Mengambil data (${timeLeft--}s)`;
-                if (timeLeft < 0) {
-                    clearInterval(timer);
-                    fetch('/request_sensor_data', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ esp32_ip, sensor })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'sukses') {
-                            valueSpan.innerText = data[sensor];
-                            nextButton.style.display = 'block';
-                        } else {
-                            valueSpan.innerText = 'Gagal: ' + data.message;
-                            retryButton.style.display = 'block';
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        valueSpan.innerText = 'Gagal: ' + error.message;
-                        retryButton.style.display = 'block';
-                    })
-                    .finally(() => {
-                        button.disabled = false;
-                        button.innerText = 'Cek sekarang';
-                    });
-                }
-            }, 1000);
-        }
-
-        document.getElementById('startHeartRateCheck').addEventListener('click', function() {
-            startCheck('HeartRate', 'heart_rate');
-        });
-
-        document.getElementById('retryHeartRateCheck').addEventListener('click', function() {
-            startCheck('HeartRate', 'heart_rate');
-        });
-
-        document.getElementById('startOxygenLevelCheck').addEventListener('click', function() {
-            startCheck('OxygenLevel', 'oxygen_level');
-        });
-
-        document.getElementById('retryOxygenLevelCheck').addEventListener('click', function() {
-            startCheck('OxygenLevel', 'oxygen_level');
-        });
-
-        document.getElementById('startTemperatureCheck').addEventListener('click', function() {
-            startCheck('Temperature', 'temperature');
-        });
-
-        document.getElementById('retryTemperatureCheck').addEventListener('click', function() {
-            startCheck('Temperature', 'temperature');
-        });
-
-        document.getElementById('startActivityLevelCheck').addEventListener('click', function() {
-            startCheck('ActivityLevel', 'activity_level');
-        });
-
-        document.getElementById('retryActivityLevelCheck').addEventListener('click', function() {
-            startCheck('ActivityLevel', 'activity_level');
-        });
-
-        document.getElementById('startECGCheck').addEventListener('click', function() {
-            const button = document.getElementById('startECGCheck');
-            const retryButton = document.getElementById('retryECGCheck');
-            const valueSpan = document.getElementById('ECGValue');
-            const nextButton = document.getElementById('nextStep5');
-            const ecgStatus = document.getElementById('ecgDataStatus');
-            button.disabled = true;
-            retryButton.style.display = 'none';
-            ecgStatus.style.display = 'block';
-
-            fetch('/request_sensor_data', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ esp32_ip, sensor: 'ecg' })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'sukses') {
-                    ecgStatus.innerText = 'Pengumpulan data ECG berhasil dimulai.';
-                    nextButton.style.display = 'block';
-                } else {
-                    ecgStatus.innerText = 'Gagal: ' + data.message;
-                    retryButton.style.display = 'block';
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                ecgStatus.innerText = 'Gagal: ' + error.message;
-                retryButton.style.display = 'block';
-            })
-            .finally(() => {
-                button.disabled = false;
-                ecgStatus.style.display = 'none';
-            });
-        });
-
-        document.getElementById('retryECGCheck').addEventListener('click', function() {
-            startCheck('ECG', 'ecg');
-        });
-
-        document.getElementById('submitHealthCheck').addEventListener('click', function() {
-            const formData = {
-                heart_rate: document.getElementById('HeartRateValue').innerText.split(': ')[1],
-                oxygen_level: document.getElementById('OxygenLevelValue').innerText.split(': ')[1],
-                temperature: document.getElementById('TemperatureValue').innerText.split(': ')[1],
-                activity_level: document.getElementById('ActivityLevelValue').innerText.split(': ')[1],
-                ecg_value: document.getElementById('ECGValue').innerText.split(': ')[1]
-            };
-            fetch('{{ url_for("main.sensor_data") }}', {
-                method: "POST",
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'sukses') {
-                    $('#healthCheckModal').modal('hide');
-                    window.location.href = "{{ url_for('main.index') }}";
-                } else {
-                    alert('Gagal menyimpan data kesehatan');
-                }
-            })
-            .catch(error => console.error('Error:', error));
-        });
-
-        // Tambahkan event listener untuk tombol "Selanjutnya"
-        document.getElementById('nextStep1').addEventListener('click', function() {
+    function updateHealthCheckSteps() {
+        const healthStatus = JSON.parse('{{ health_status | tojson | safe }}');
+        
+        // Check and display the appropriate step
+        if (healthStatus.heart_rate === null) {
+            document.getElementById('health-check-step-1').style.display = 'block';
+            currentStep = 1;
+        } else if (healthStatus.oxygen_level === null) {
             document.getElementById('health-check-step-1').style.display = 'none';
             document.getElementById('health-check-step-2').style.display = 'block';
             currentStep = 2;
-        });
-
-        document.getElementById('nextStep2').addEventListener('click', function() {
+        } else if (healthStatus.temperature === null) {
             document.getElementById('health-check-step-2').style.display = 'none';
             document.getElementById('health-check-step-3').style.display = 'block';
             currentStep = 3;
-        });
-
-        document.getElementById('nextStep3').addEventListener('click', function() {
+        } else if (healthStatus.activity_level === null) {
             document.getElementById('health-check-step-3').style.display = 'none';
             document.getElementById('health-check-step-4').style.display = 'block';
             currentStep = 4;
-        });
-
-        document.getElementById('nextStep4').addEventListener('click', function() {
+        } else if (healthStatus.ecg === null) {
             document.getElementById('health-check-step-4').style.display = 'none';
             document.getElementById('health-check-step-5').style.display = 'block';
             currentStep = 5;
-        });
-
-        document.getElementById('nextStep5').addEventListener('click', function() {
+        } else {
             document.getElementById('health-check-step-5').style.display = 'none';
             document.getElementById('submitHealthCheck').style.display = 'block';
+            currentStep = 6;
+        }
+    }
+    // Ensure this function is called when the modal is shown
+    document.getElementById('healthCheckModal').addEventListener('shown.bs.modal', updateHealthCheckSteps);
+
+    function startCheck(step, sensor) {
+        const button = document.getElementById(`start${step}Check`);
+        const retryButton = document.getElementById(`retry${step}Check`);
+        const valueSpan = document.getElementById(`${step}Value`);
+        const nextButton = document.getElementById(`nextStep${currentStep}`);
+        button.disabled = true;
+        retryButton.style.display = 'none';
+        let timeLeft = 10;
+        
+        const timer = setInterval(() => {
+            button.innerText = `Mengambil data (${timeLeft--}s)`;
+            if (timeLeft < 0) {
+                clearInterval(timer);
+                fetch('/request_sensor_data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ esp32_ip, sensor })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'sukses') {
+                        valueSpan.innerText = data[sensor];
+                        nextButton.style.display = 'block';
+                    } else {
+                        valueSpan.innerText = 'Gagal: ' + data.message;
+                        retryButton.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    valueSpan.innerText = 'Gagal: ' + error.message;
+                    retryButton.style.display = 'block';
+                })
+                .finally(() => {
+                    button.disabled = false;
+                    button.innerText = 'Cek sekarang';
+                });
+            }
+        }, 1000);
+    }
+
+    document.getElementById('startHeartRateCheck').addEventListener('click', function() {
+        startCheck('HeartRate', 'heart_rate');
+    });
+
+    document.getElementById('retryHeartRateCheck').addEventListener('click', function() {
+        startCheck('HeartRate', 'heart_rate');
+    });
+
+    document.getElementById('startOxygenLevelCheck').addEventListener('click', function() {
+        startCheck('OxygenLevel', 'oxygen_level');
+    });
+
+    document.getElementById('retryOxygenLevelCheck').addEventListener('click', function() {
+        startCheck('OxygenLevel', 'oxygen_level');
+    });
+
+    document.getElementById('startTemperatureCheck').addEventListener('click', function() {
+        startCheck('Temperature', 'temperature');
+    });
+
+    document.getElementById('retryTemperatureCheck').addEventListener('click', function() {
+        startCheck('Temperature', 'temperature');
+    });
+
+    document.getElementById('startActivityLevelCheck').addEventListener('click', function() {
+        startCheck('ActivityLevel', 'activity_level');
+    });
+
+    document.getElementById('retryActivityLevelCheck').addEventListener('click', function() {
+        startCheck('ActivityLevel', 'activity_level');
+    });
+    
+    document.getElementById('startECGCheck').addEventListener('click', function() {
+        const button = document.getElementById('startECGCheck');
+        const retryButton = document.getElementById('retryECGCheck');
+        const valueSpan = document.getElementById('ECGValue');
+        const nextButton = document.getElementById('nextStep5');
+        const ecgStatus = document.getElementById('ecgDataStatus');
+        button.disabled = true;
+        retryButton.style.display = 'none';
+        ecgStatus.style.display = 'block';
+
+        fetch('/request_sensor_data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ esp32_ip, sensor: 'ecg' })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'sukses') {
+                ecgStatus.innerText = 'Pengumpulan data ECG berhasil dimulai.';
+                nextButton.style.display = 'block';
+            } else {
+                ecgStatus.innerText = 'Gagal: ' + data.message;
+                retryButton.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            ecgStatus.innerText = 'Gagal: ' + error.message;
+            retryButton.style.display = 'block';
+        })
+        .finally(() => {
+            button.disabled = false;
+            ecgStatus.style.display = 'none';
         });
+    });
+
+    document.getElementById('retryECGCheck').addEventListener('click', function() {
+        startCheck('ECG', 'ecg');
+    });
+
+    document.getElementById('submitHealthCheck').addEventListener('click', function() {
+        const formData = {
+            heart_rate: document.getElementById('HeartRateValue').innerText.split(': ')[1],
+            oxygen_level: document.getElementById('OxygenLevelValue').innerText.split(': ')[1],
+            temperature: document.getElementById('TemperatureValue').innerText.split(': ')[1],
+            activity_level: document.getElementById('ActivityLevelValue').innerText.split(': ')[1],
+            ecg_value: document.getElementById('ECGValue').innerText.split(': ')[1]
+        };
+        fetch('{{ url_for("main.sensor_data") }}', {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'sukses') {
+                $('#healthCheckModal').modal('hide');
+                window.location.href = "{{ url_for('main.index') }}";
+            } else {
+                alert('Gagal menyimpan data kesehatan');
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    });
+
+    document.getElementById('nextStep1').addEventListener('click', function() {
+        document.getElementById('health-check-step-1').style.display = 'none';
+        document.getElementById('health-check-step-2').style.display = 'block';
+        currentStep = 2;
+    });
+
+    document.getElementById('nextStep2').addEventListener('click', function() {
+        document.getElementById('health-check-step-2').style.display = 'none';
+        document.getElementById('health-check-step-3').style.display = 'block';
+        currentStep = 3;
+    });
+
+    document.getElementById('nextStep3').addEventListener('click', function() {
+        document.getElementById('health-check-step-3').style.display = 'none';
+        document.getElementById('health-check-step-4').style.display = 'block';
+        currentStep = 4;
+    });
+
+    document.getElementById('nextStep4').addEventListener('click', function() {
+        document.getElementById('health-check-step-4').style.display = 'none';
+        document.getElementById('health-check-step-5').style.display = 'block';
+        currentStep = 5;
+    });
+
+    document.getElementById('nextStep5').addEventListener('click', function() {
+        document.getElementById('health-check-step-5').style.display = 'none';
+        document.getElementById('submitHealthCheck').style.display = 'block';
     });
 </script>
 {% endblock javascripts %}

@@ -36,6 +36,9 @@ def get_health_check_status(user_id):
         'activity_level': health_data[3] == 1,
         'ecg': health_data[4] == 1
     }
+
+    current_app.logger.debug(f"Updated health status: {session['health_status']}")
+
     return session['health_status']
 
 @main_bp.route('/')
@@ -66,7 +69,6 @@ def index():
         """)
         daily_health_data_raw = cursor.fetchall()
 
-        # Get health checks for today, this week, and all
         today = datetime.now().date()
         start_of_week = today - timedelta(days=today.weekday())
 
@@ -99,13 +101,11 @@ def index():
 
         cursor.close()
 
-        # Process the data for charts
         health_check_labels = [stat[0].strftime('%d %b') for stat in daily_health_data_raw]
-        daily_health_data = [stat[1] * 100 for stat in daily_health_data_raw]  # Convert to percentage
+        daily_health_data = [stat[1] * 100 for stat in daily_health_data_raw]
         weekly_health_data = []
         monthly_health_data = []
 
-        # Calculate weekly and monthly averages
         for i in range(0, len(daily_health_data_raw), 7):
             weekly_avg = sum(d[1] for d in daily_health_data_raw[i:i+7]) / 7 * 100
             weekly_health_data.append(weekly_avg)
@@ -124,17 +124,15 @@ def index():
                                weekly_health_checks=weekly_health_checks,
                                all_health_checks=all_health_checks)
     else:
-        # Cek apakah pengecekan kesehatan sudah selesai hari ini
         cursor.execute("""
             SELECT completed FROM health_checks
             WHERE user_id = %s AND check_date = CURDATE()
         """, (current_user.id,))
         health_check = cursor.fetchone()
         
-        if health_check and health_check[0]:  # Pengecekan sudah selesai
+        if health_check and health_check[0]:
             return render_template('home/index_karyawan.html')
 
-        # Jika belum selesai, lanjutkan dengan pengecekan kesehatan
         health_status = get_health_check_status(current_user.id)
         cursor.execute("""
             SELECT heart_rate, oxygen_level, temperature, activity_level 
@@ -227,7 +225,7 @@ def health_check():
 @main_bp.route('/health_check_modal')
 @login_required
 def health_check_modal():
-    health_status = get_health_check_status(current_user.id)
+    health_status = get_health_check_status(current_user.id) or {}
     return render_template('health_check_modal.html', health_status=health_status)
 
 @main_bp.route('/get_sensor_data/<sensor>', methods=['GET'])
@@ -244,6 +242,7 @@ def get_sensor_data(sensor):
     except Exception as e:
         return jsonify({'status': 'gagal', 'message': str(e)}), 500
 
+# Fungsi untuk menyimpan data sensor
 @main_bp.route('/sensor_data', methods=['POST'])
 def sensor_data():
     data = request.get_json()
@@ -252,7 +251,7 @@ def sensor_data():
     oxygen_level = data.get('oxygen_level')
     temperature = data.get('temperature')
     activity_level = data.get('activity_level')
-    ecg_values = data.get('value')  # Mengambil array nilai ECG
+    ecg_values = data.get('ecg_value')  # Pastikan menerima ecg_value sebagai list
 
     if user_id == 0 or user_id is None:
         current_app.logger.error("Invalid user_id received.")
@@ -262,24 +261,19 @@ def sensor_data():
     cursor = connection.cursor()
 
     try:
-        # Simpan data heart_rate, oxygen_level, temperature, dan activity_level
+        # Simpan data lainnya
         cursor.execute("""
             INSERT INTO sensor_data (user_id, heart_rate, oxygen_level, temperature, activity_level)
             VALUES (%s, %s, %s, %s, %s)
         """, (user_id, heart_rate, oxygen_level, temperature, activity_level))
 
-        # Simpan data ECG jika ada
-        if ecg_values:
-            for ecg_value in ecg_values:
-                # Abaikan nilai ECG yang tidak valid (contoh: 4095)
-                if ecg_value != 4095:
-                    cursor.execute("""
-                        INSERT INTO ecg_data (user_id, ecg_value, timestamp)
-                        VALUES (%s, %s, NOW())
-                    """, (user_id, ecg_value))
+        # Simpan data ECG sebagai JSON atau per baris
+        for ecg_value in ecg_values:
+            cursor.execute("""
+                INSERT INTO ecg_data (user_id, ecg_value, timestamp)
+                VALUES (%s, %s, NOW())
+            """, (user_id, ecg_value))
 
-        check_date = datetime.now().date()
-        cursor.execute("UPDATE health_checks SET completed = TRUE WHERE user_id = %s AND check_date = %s", (user_id, check_date))
         connection.commit()
         return jsonify({"status": "sukses"})
     except mysql.connector.errors.IntegrityError as e:
