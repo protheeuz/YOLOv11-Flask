@@ -18,21 +18,18 @@ def get_health_check_status(user_id):
 
     cursor.execute("""
         SELECT 
-            heart_rate,
-            oxygen_level,
-            temperature,
-            activity_level,
-            ecg_value
+            MAX(heart_rate) AS heart_rate,
+            MAX(oxygen_level) AS oxygen_level,
+            MAX(temperature) AS temperature,
+            MAX(activity_level) AS activity_level,
+            MAX(ecg_value) AS ecg_value
         FROM sensor_data
         WHERE user_id = %s AND DATE(timestamp) = CURDATE()
-        ORDER BY timestamp DESC LIMIT 1
     """, (user_id,))
     health_data = cursor.fetchone()
     cursor.close()
 
     if health_data is None:
-        # Jika tidak ada data kesehatan untuk user_id pada hari ini, 
-        # kita anggap semua parameter kesehatan belum tersedia
         health_status = {
             'heart_rate': False,
             'oxygen_level': False,
@@ -41,7 +38,6 @@ def get_health_check_status(user_id):
             'ecg': False
         }
     else:
-        # Periksa dan update status kesehatan berdasarkan data dari database
         health_status = {
             'heart_rate': health_data[0] is not None,
             'oxygen_level': health_data[1] is not None,
@@ -50,9 +46,7 @@ def get_health_check_status(user_id):
             'ecg': health_data[4] is not None
         }
 
-    # Update session dengan status kesehatan
     session['health_status'] = health_status
-
     return health_status
 
 @main_bp.route('/')
@@ -147,37 +141,55 @@ def index():
             WHERE user_id = %s AND check_date = CURDATE()
         """, (current_user.id,))
         health_check = cursor.fetchone()
-        
-        if health_check and health_check[0]:  # Pengecekan sudah selesai
-            return render_template('home/index_karyawan.html')
 
-        # Jika belum selesai, lanjutkan dengan pengecekan kesehatan
-        health_status = get_health_check_status(current_user.id)
+        # Ambil data kesehatan terbaru dengan menggabungkan semua sensor dalam satu query
         cursor.execute("""
-            SELECT heart_rate, oxygen_level, temperature, activity_level 
+            SELECT 
+                MAX(CASE WHEN heart_rate IS NOT NULL THEN heart_rate ELSE NULL END) AS heart_rate,
+                MAX(CASE WHEN oxygen_level IS NOT NULL THEN oxygen_level ELSE NULL END) AS oxygen_level,
+                MAX(CASE WHEN temperature IS NOT NULL THEN temperature ELSE NULL END) AS temperature,
+                MAX(CASE WHEN activity_level IS NOT NULL THEN activity_level ELSE NULL END) AS activity_level
             FROM sensor_data
-            WHERE user_id = %s ORDER BY timestamp DESC LIMIT 1
+            WHERE user_id = %s AND DATE(timestamp) = CURDATE()
         """, (current_user.id,))
         latest_health_data = cursor.fetchone()
 
         cursor.execute("""
             SELECT ecg_value, timestamp 
             FROM sensor_data
-            WHERE user_id = %s ORDER BY timestamp DESC
+            WHERE user_id = %s AND ecg_value IS NOT NULL AND DATE(timestamp) = CURDATE()
+            ORDER BY timestamp DESC
         """, (current_user.id,))
         ecg_data = cursor.fetchall()
 
         cursor.close()
 
+        if latest_health_data is None:
+            latest_health_data = {
+                'heart_rate': '-',
+                'oxygen_level': '-',
+                'temperature': '-',
+                'activity_level': '-'
+            }
+        else:
+            latest_health_data = {
+                'heart_rate': latest_health_data[0] or '-',
+                'oxygen_level': latest_health_data[1] or '-',
+                'temperature': latest_health_data[2] or '-',
+                'activity_level': latest_health_data[3] or '-'
+            }
+
         ecg_values = [data[0] for data in ecg_data]
         ecg_timestamps = [data[1].strftime('%H:%M:%S') for data in ecg_data]
+
+        health_status = get_health_check_status(current_user.id)
 
         return render_template('home/index_karyawan.html',
                                latest_health_data=latest_health_data,
                                ecg_values=ecg_values,
                                ecg_timestamps=ecg_timestamps,
                                health_status=health_status)
-        
+
 @main_bp.route('/index_karyawan')
 @login_required
 def index_karyawan():
@@ -191,29 +203,47 @@ def index_karyawan():
     """, (current_user.id,))
     health_check = cursor.fetchone()
     
-    if health_check and health_check[0]:  # Pengecekan sudah selesai
-        return render_template('home/index_karyawan.html')
-
-    # Jika belum selesai, lanjutkan dengan pengecekan kesehatan
-    health_status = get_health_check_status(current_user.id)
+    # Ambil data kesehatan terbaru dengan menggabungkan semua sensor dalam satu query
     cursor.execute("""
-        SELECT heart_rate, oxygen_level, temperature, activity_level 
+        SELECT 
+            MAX(CASE WHEN heart_rate IS NOT NULL THEN heart_rate ELSE NULL END) AS heart_rate,
+            MAX(CASE WHEN oxygen_level IS NOT NULL THEN oxygen_level ELSE NULL END) AS oxygen_level,
+            MAX(CASE WHEN temperature IS NOT NULL THEN temperature ELSE NULL END) AS temperature,
+            MAX(CASE WHEN activity_level IS NOT NULL THEN activity_level ELSE NULL END) AS activity_level
         FROM sensor_data
-        WHERE user_id = %s ORDER BY timestamp DESC LIMIT 1
+        WHERE user_id = %s AND DATE(timestamp) = CURDATE()
     """, (current_user.id,))
     latest_health_data = cursor.fetchone()
 
     cursor.execute("""
         SELECT ecg_value, timestamp 
         FROM sensor_data
-        WHERE user_id = %s ORDER BY timestamp DESC
+        WHERE user_id = %s AND ecg_value IS NOT NULL AND DATE(timestamp) = CURDATE()
+        ORDER BY timestamp DESC
     """, (current_user.id,))
     ecg_data = cursor.fetchall()
 
     cursor.close()
 
+    if latest_health_data is None:
+        latest_health_data = {
+            'heart_rate': '-',
+            'oxygen_level': '-',
+            'temperature': '-',
+            'activity_level': '-'
+        }
+    else:
+        latest_health_data = {
+            'heart_rate': latest_health_data[0] or '-',
+            'oxygen_level': latest_health_data[1] or '-',
+            'temperature': latest_health_data[2] or '-',
+            'activity_level': latest_health_data[3] or '-'
+        }
+
     ecg_values = [data[0] for data in ecg_data]
     ecg_timestamps = [data[1].strftime('%H:%M:%S') for data in ecg_data]
+
+    health_status = get_health_check_status(current_user.id)
 
     return render_template('home/index_karyawan.html',
                            latest_health_data=latest_health_data,
@@ -352,6 +382,9 @@ def sensor_data():
             """, (user_id, check_date, 1))
             connection.commit()
 
+            # Redirect ke dashboard setelah data lengkap
+            return jsonify({"status": "sukses", "redirect": url_for('main.index_karyawan')})
+
         return jsonify({"status": "sukses"})
     except mysql.connector.errors.IntegrityError as e:
         connection.rollback()
@@ -388,6 +421,7 @@ def request_sensor_data():
             connection = get_db()
             cursor = connection.cursor()
 
+            # Simpan data sensor
             if sensor == 'ecg':
                 if isinstance(data.get('value'), list):
                     ecg_values_json = json.dumps(data['value'])
@@ -428,7 +462,7 @@ def request_sensor_data():
 
                 cursor.close()
                 # Redirect ke dashboard jika pengecekan kesehatan sudah lengkap
-                return redirect(url_for('main.index_karyawan'))
+                return jsonify({'status': 'sukses', 'redirect': url_for('main.index_karyawan')})
 
             cursor.close()
             return jsonify({'status': 'sukses', 'message': f'Data {sensor.capitalize()} berhasil disimpan'})
@@ -489,7 +523,7 @@ def update_profile():
 @login_required
 def update_profile_image():
     profile_image = request.files.get('profile_image')
-    if (profile_image):
+    if profile_image:
         profile_image_filename = save_profile_image(profile_image)
 
         connection = get_db()

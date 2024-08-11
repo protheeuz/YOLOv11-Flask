@@ -461,8 +461,35 @@
             return;
         }
 
-        // Jika semua selesai, tampilkan tombol submit
-        document.getElementById('submitHealthCheck').style.display = 'block';
+        // Semua data sudah didapatkan, langsung kirim data dan redirect
+        submitHealthCheckData();
+    }
+
+    function submitHealthCheckData() {
+        const formData = {
+            heart_rate: document.getElementById('HeartRateValue').innerText.split(': ')[1],
+            oxygen_level: document.getElementById('OxygenLevelValue').innerText.split(': ')[1],
+            temperature: document.getElementById('TemperatureValue').innerText.split(': ')[1],
+            activity_level: document.getElementById('ActivityLevelValue').innerText.split(': ')[1],
+            ecg_value: document.getElementById('ECGValue').innerText.split(': ')[1]
+        };
+
+        fetch('{{ url_for("main.sensor_data") }}', {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'sukses') {
+                window.location.href = '{{ url_for("main.index_karyawan") }}';
+            } else {
+                alert('Gagal menyimpan data kesehatan');
+            }
+        })
+        .catch(error => console.error('Error:', error));
     }
 
     document.addEventListener('DOMContentLoaded', (event) => {
@@ -607,30 +634,7 @@
         });
 
         document.getElementById('submitHealthCheck').addEventListener('click', function() {
-            const formData = {
-                heart_rate: document.getElementById('HeartRateValue').innerText.split(': ')[1],
-                oxygen_level: document.getElementById('OxygenLevelValue').innerText.split(': ')[1],
-                temperature: document.getElementById('TemperatureValue').innerText.split(': ')[1],
-                activity_level: document.getElementById('ActivityLevelValue').innerText.split(': ')[1],
-                ecg_value: document.getElementById('ECGValue').innerText.split(': ')[1]
-            };
-            fetch('{{ url_for("main.sensor_data") }}', {
-                method: "POST",
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(formData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'sukses') {
-                    $('#healthCheckModal').modal('hide');
-                    window.location.href = "{{ url_for('main.index') }}";
-                } else {
-                    alert('Gagal menyimpan data kesehatan');
-                }
-            })
-            .catch(error => console.error('Error:', error));
+            submitHealthCheckData();
         });
 
         document.getElementById('nextStep1').addEventListener('click', function() {
@@ -659,7 +663,7 @@
 
         document.getElementById('nextStep5').addEventListener('click', function() {
             document.getElementById('health-check-step-5').style.display = 'none';
-            document.getElementById('submitHealthCheck').style.display = 'block';
+            submitHealthCheckData();
         });
     });
 </script>
