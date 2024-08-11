@@ -306,7 +306,7 @@ def login_face():
                 health_check = cursor.fetchone()
                 cursor.close()
 
-                if not health_check atau not health_check[0]:
+                if not health_check or not health_check[0]:
                     return jsonify({"status": "health_check_required", "user_id": user_id})
 
                 return jsonify({"status": "sukses", "user_id": user_id})
