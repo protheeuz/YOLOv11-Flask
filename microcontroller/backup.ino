@@ -35,7 +35,7 @@ uint32_t heartRate;
 uint32_t spo2;
 float activity_level;
 int ecg_value;
-int user_id = -1;
+int user_id = -1;  // Default invalid user_id
 
 // Custom characters for LCD
 byte heart[8] = {
@@ -108,7 +108,7 @@ bool ecgCollecting = false;
 unsigned long startMillis;
 unsigned long endMillis;
 const int sampleInterval = 100;    // 100ms
-const int sampleDuration = 20000;  // 20 seconds
+const int sampleDuration = 15000;  // 15 seconds
 std::vector<int> ecgData;
 
 void setup() {
@@ -278,23 +278,32 @@ void setup() {
       endMillis = startMillis + sampleDuration;
       ecgTicker.attach_ms(sampleInterval, collectECG);
       request->send(200, "application/json", "{\"status\":\"sukses\", \"message\":\"ECG collection started\"}");
-    } else if (!ecgCollecting && !ecgData.empty()) {
-      DynamicJsonDocument doc(4096);
-      doc["status"] = "sukses";
-      JsonArray data = doc.createNestedArray("value");
+    } else if (millis() >= endMillis) {
+      // Cek apakah data sudah terkumpul sepenuhnya
+      if (ecgData.size() > 0) {
+        DynamicJsonDocument doc(4096);
+        doc["status"] = "sukses";
+        doc["user_id"] = user_id;
+        JsonArray data = doc.createNestedArray("value");
 
-      for (int value : ecgData) {
-        data.add(value);
+        for (int value : ecgData) {
+          data.add(value);
+        }
+
+        String jsonResponse;
+        serializeJson(doc, jsonResponse);
+        request->send(200, "application/json", jsonResponse);
+      } else {
+        request->send(400, "application/json", "{\"status\":\"gagal\", \"message\":\"No ECG data collected\"}");
       }
-
-      String jsonResponse;
-      serializeJson(doc, jsonResponse);
-      request->send(200, "application/json", jsonResponse);
-      ecgData.clear();  // Clear data after sending
+      ecgData.clear();
+      ecgCollecting = false;
+      ecgTicker.detach();
     } else {
-      request->send(400, "application/json", "{\"status\":\"gagal\", \"message\":\"ECG collection already in progress or no data\"}");
+      request->send(400, "application/json", "{\"status\":\"gagal\", \"message\":\"ECG collection still in progress or no data\"}");
     }
   });
+
 
   server.begin();
 }
@@ -341,11 +350,6 @@ void collectECG() {
   if (ecg_value < 4095) {  // Hanya simpan data yang valid
     ecgData.push_back(ecg_value);
   }
-  if (millis() >= endMillis) {
-    ecgTicker.detach();
-    ecgCollecting = false;
-    sendECGData();
-  }
 }
 
 void sendECGData() {
@@ -356,6 +360,7 @@ void sendECGData() {
 
   DynamicJsonDocument doc(4096);
   doc["status"] = "sukses";
+  doc["user_id"] = user_id;  // Pastikan user_id dikirim
   JsonArray data = doc.createNestedArray("value");
 
   for (int value : ecgData) {

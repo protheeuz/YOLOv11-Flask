@@ -215,14 +215,12 @@ def login():
         if user_data:
             stored_password = user_data[1]
             password_correct = bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8'))
-            current_app.logger.debug(f"Stored password: {stored_password}, Input password: {password}, Password correct: {password_correct}")
 
             if password_correct:
                 user = User.get(user_data[0])
                 login_user(user)
                 session['user_id'] = user_data[0]
                 session['session_token'] = generate_session_token()
-                current_app.logger.debug(f'Session after login (username/password): {session.items()}')
                 cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_data[0],))
                 connection.commit()
 
@@ -232,7 +230,6 @@ def login():
                 if user_data[2] == 'admin':
                     return jsonify({"status": "sukses", "user_id": user_data[0]})
                 
-                current_app.logger.debug(f"Attempting to send user_id {user_data[0]} ke ESP 32 at {esp32_ip}")
                 if send_user_id_to_esp32(user_data[0], esp32_ip):
                     check_date = datetime.now().date()
                     cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_data[0], check_date))
@@ -244,29 +241,24 @@ def login():
 
                     return jsonify({"status": "sukses", "user_id": user_data[0]})
                 else:
-                    current_app.logger.error("Gagal mengirim user_id ke ESP 32")
                     return jsonify({"status": "gagal", "message": "Gagal mengirim user_id ke ESP 32"})
 
         cursor.close()
         return jsonify({"status": "gagal", "message": "NIK atau password salah"})
-                                                                                                                                        
+
     health_status = session.get('health_status', {})
     return render_template('auth/login.html', health_status=health_status)
 
 @auth_bp.route('/login_face', methods=['POST'])
 def login_face():
-    logging.debug("Memulai proses login wajah")
-    
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     if not cap.isOpened():
-        logging.error("Tidak dapat mengakses kamera")
         return jsonify({"status": "gagal", "pesan": "Tidak dapat mengakses kamera"}), 400
 
     ret, frame = cap.read()
     cap.release()
 
     if not ret:
-        logging.error("Tidak dapat mengambil frame dari kamera")
         return jsonify({"status": "gagal", "pesan": "Tidak dapat mengambil frame dari kamera"}), 400
 
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -274,18 +266,14 @@ def login_face():
     faces = face_cascade.detectMultiScale(gray, 1.1, 4)
 
     if len(faces) == 0:
-        logging.error("Tidak ada wajah yang terdeteksi")
         return jsonify({"status": "gagal", "pesan": "Tidak ada wajah yang terdeteksi"}), 400
 
     try:
-        logging.debug("Mengambil representasi wajah")
         result = DeepFace.represent(frame, model_name='Facenet', enforce_detection=False)
         face_encoding = result[0]["embedding"]
-        logging.debug(f"Representasi wajah berhasil diambil: {face_encoding}")
 
         user_id = recognize_face(face_encoding)
         if user_id:
-            logging.debug(f"Wajah dikenali, user_id: {user_id}")
             connection = get_db()
             cursor = connection.cursor()
             cursor.execute("SELECT role FROM users WHERE id=%s", (user_id,))
@@ -298,7 +286,6 @@ def login_face():
             
             session['user_id'] = user_id
             session['session_token'] = generate_session_token()
-            current_app.logger.debug(f'Session after login (face): {session.items()}')
 
             # Simpan status kesehatan di sesi
             session['health_status'] = get_health_check_status(user_id)
@@ -307,7 +294,6 @@ def login_face():
             if user_role == 'admin':
                 return jsonify({"status": "sukses", "user_id": user_id})
 
-            current_app.logger.debug(f"Attempting to send user_id {user_id} ke ESP 32 at 192.168.20.184")
             if send_user_id_to_esp32(user_id, '192.168.20.184'):
                 check_date = datetime.now().date()
                 cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
@@ -319,14 +305,11 @@ def login_face():
 
                 return jsonify({"status": "sukses", "user_id": user_id})
             else:
-                current_app.logger.error("Gagal mengirim user_id ke ESP 32")
                 return jsonify({"status": "gagal", "message": "Gagal mengirim user_id ke ESP 32"})
 
         else:
-            logging.error("Wajah tidak dikenali")
             return jsonify({"status": "gagal", "pesan": "Wajah tidak dikenali"}), 401
     except Exception as e:
-        logging.exception("Terjadi kesalahan saat memproses wajah")
         return jsonify({"status": "gagal", "pesan": "Tidak ada wajah yang ditemukan"}), 400
 
 @auth_bp.route('/login_qr', methods=['POST'])
@@ -335,15 +318,12 @@ def login_qr():
     qr_code = data.get('qr_code')
     user_code = data.get('user_code')
     
-    logging.debug(f'Received qr_code: {qr_code}, user_code: {user_code}')
-    
     connection = get_db()
     cursor = connection.cursor()
     cursor.execute("SELECT id, unique_code, role FROM users WHERE nik=%s", (qr_code,))
     user = cursor.fetchone()
     
     if user:
-        logging.debug(f'User found: {user}')
         if user_code == user[1]:
             user_id = user[0]
             user_role = user[2]
@@ -355,7 +335,6 @@ def login_qr():
             
             session['user_id'] = user_id
             session['session_token'] = generate_session_token()
-            current_app.logger.debug(f'Session after login (QR): {session.items()}')
 
             # Simpan status kesehatan di sesi
             session['health_status'] = get_health_check_status(user_id)
@@ -364,7 +343,6 @@ def login_qr():
             if user_role == 'admin':
                 return jsonify({"status": "sukses", "user_id": user_id})
 
-            current_app.logger.debug(f"Attempting to send user_id {user_id} ke ESP 32 at 192.168.20.184")
             if send_user_id_to_esp32(user_id, '192.168.20.184'):
                 check_date = datetime.now().date()
                 cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
@@ -376,14 +354,11 @@ def login_qr():
 
                 return jsonify({"status": "sukses", "user_id": user_id})
             else:
-                current_app.logger.error("Gagal mengirim user_id ke ESP 32")
                 return jsonify({"status": "gagal", "message": "Gagal mengirim user_id ke ESP 32"})
         else:
-            logging.debug('Invalid unique code')
             cursor.close()
             return jsonify({"status": "gagal", "pesan": "Kode unik tidak valid"}), 401
     else:
-        logging.debug('Invalid QR code')
         cursor.close()
         return jsonify({"status": "gagal", "pesan": "QR Code tidak valid"}), 401
 
@@ -460,22 +435,16 @@ def send_user_id_to_esp32(user_id, esp32_ip):
     try:
         payload = json.dumps({'user_id': user_id})
         headers = {'Content-Type': 'application/json'}
-        current_app.logger.debug(f"Sending payload ke ESP 32: {payload}")
-        current_app.logger.debug(f"Headers: {headers}")
         response = requests.post(f'http://{esp32_ip}/set_user_id', data=payload, headers=headers)
-        current_app.logger.debug(f"Response from ESP32: {response.status_code}, {response.text}")
         if response.status_code == 200:
             response_json = response.json()
             if response_json.get("status") == "sukses":
                 return True
             else:
-                current_app.logger.error(f"Failed to set user_id on ESP32: {response_json}")
                 return False
         else:
-            current_app.logger.error(f"Gagal mengirimkan data user ke Mikrokontroller: {response.status_code}")
             return False
     except Exception as e:
-        current_app.logger.error(f"Error sending user_id ke ESP 32: {e}")
         return False
     
 @auth_bp.route('/send_session_token', methods=['POST'])
@@ -484,7 +453,6 @@ def send_session_token():
     data = request.get_json()
     esp32_ip = data.get('esp32_ip')
     session_token = session.get('session_token')
-    current_app.logger.debug(f'Sending session_token {session_token} ke ESP 32 at {esp32_ip}')
 
     response = requests.post(f'http://{esp32_ip}/set_session_token', json={'session_token': session_token})
 

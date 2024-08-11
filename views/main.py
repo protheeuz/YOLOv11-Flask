@@ -1,4 +1,3 @@
-# views/main.py
 from flask import Blueprint, flash, render_template, redirect, url_for, request, jsonify, current_app, session
 from flask_login import login_required, current_user, login_user
 from database import get_db
@@ -11,35 +10,49 @@ import mysql.connector
 
 main_bp = Blueprint('main', __name__)
 
+# Memeriksa status kesehatan langsung dari database saat memuat halaman
 def get_health_check_status(user_id):
     connection = get_db()
     cursor = connection.cursor()
 
     cursor.execute("""
         SELECT 
-            MAX(CASE WHEN heart_rate IS NOT NULL THEN 1 ELSE 0 END) AS heart_rate_done,
-            MAX(CASE WHEN oxygen_level IS NOT NULL THEN 1 ELSE 0 END) AS oxygen_level_done,
-            MAX(CASE WHEN temperature IS NOT NULL THEN 1 ELSE 0 END) AS temperature_done,
-            MAX(CASE WHEN activity_level IS NOT NULL THEN 1 ELSE 0 END) AS activity_level_done,
-            MAX(CASE WHEN ecg_value IS NOT NULL THEN 1 ELSE 0 END) AS ecg_done
+            heart_rate,
+            oxygen_level,
+            temperature,
+            activity_level,
+            ecg_value
         FROM sensor_data
         WHERE user_id = %s AND DATE(timestamp) = CURDATE()
+        ORDER BY timestamp DESC LIMIT 1
     """, (user_id,))
     health_data = cursor.fetchone()
-
     cursor.close()
 
-    session['health_status'] = {
-        'heart_rate': health_data[0] == 1,
-        'oxygen_level': health_data[1] == 1,
-        'temperature': health_data[2] == 1,
-        'activity_level': health_data[3] == 1,
-        'ecg': health_data[4] == 1
-    }
+    if health_data is None:
+        # Jika tidak ada data kesehatan untuk user_id pada hari ini, 
+        # kita anggap semua parameter kesehatan belum tersedia
+        health_status = {
+            'heart_rate': False,
+            'oxygen_level': False,
+            'temperature': False,
+            'activity_level': False,
+            'ecg': False
+        }
+    else:
+        # Periksa dan update status kesehatan berdasarkan data dari database
+        health_status = {
+            'heart_rate': health_data[0] is not None,
+            'oxygen_level': health_data[1] is not None,
+            'temperature': health_data[2] is not None,
+            'activity_level': health_data[3] is not None,
+            'ecg': health_data[4] is not None
+        }
 
-    current_app.logger.debug(f"Updated health status: {session['health_status']}")
+    # Update session dengan status kesehatan
+    session['health_status'] = health_status
 
-    return session['health_status']
+    return health_status
 
 @main_bp.route('/')
 @login_required
@@ -69,6 +82,7 @@ def index():
         """)
         daily_health_data_raw = cursor.fetchall()
 
+        # Get health checks for today, this week, and all
         today = datetime.now().date()
         start_of_week = today - timedelta(days=today.weekday())
 
@@ -101,11 +115,13 @@ def index():
 
         cursor.close()
 
+        # Process the data for charts
         health_check_labels = [stat[0].strftime('%d %b') for stat in daily_health_data_raw]
-        daily_health_data = [stat[1] * 100 for stat in daily_health_data_raw]
+        daily_health_data = [stat[1] * 100 for stat in daily_health_data_raw]  # Convert to percentage
         weekly_health_data = []
         monthly_health_data = []
 
+        # Calculate weekly and monthly averages
         for i in range(0, len(daily_health_data_raw), 7):
             weekly_avg = sum(d[1] for d in daily_health_data_raw[i:i+7]) / 7 * 100
             weekly_health_data.append(weekly_avg)
@@ -124,15 +140,17 @@ def index():
                                weekly_health_checks=weekly_health_checks,
                                all_health_checks=all_health_checks)
     else:
+        # Cek apakah pengecekan kesehatan sudah selesai hari ini
         cursor.execute("""
             SELECT completed FROM health_checks
             WHERE user_id = %s AND check_date = CURDATE()
         """, (current_user.id,))
         health_check = cursor.fetchone()
         
-        if health_check and health_check[0]:
+        if health_check and health_check[0]:  # Pengecekan sudah selesai
             return render_template('home/index_karyawan.html')
 
+        # Jika belum selesai, lanjutkan dengan pengecekan kesehatan
         health_status = get_health_check_status(current_user.id)
         cursor.execute("""
             SELECT heart_rate, oxygen_level, temperature, activity_level 
@@ -242,7 +260,6 @@ def get_sensor_data(sensor):
     except Exception as e:
         return jsonify({'status': 'gagal', 'message': str(e)}), 500
 
-# Fungsi untuk menyimpan data sensor
 @main_bp.route('/sensor_data', methods=['POST'])
 def sensor_data():
     data = request.get_json()
@@ -251,7 +268,7 @@ def sensor_data():
     oxygen_level = data.get('oxygen_level')
     temperature = data.get('temperature')
     activity_level = data.get('activity_level')
-    ecg_values = data.get('ecg_value')  # Pastikan menerima ecg_value sebagai list
+    ecg_values = data.get('ecg_value')
 
     if user_id == 0 or user_id is None:
         current_app.logger.error("Invalid user_id received.")
@@ -261,19 +278,14 @@ def sensor_data():
     cursor = connection.cursor()
 
     try:
-        # Simpan data lainnya
+        # Simpan data heart_rate, oxygen_level, temperature, dan activity_level
         cursor.execute("""
-            INSERT INTO sensor_data (user_id, heart_rate, oxygen_level, temperature, activity_level)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (user_id, heart_rate, oxygen_level, temperature, activity_level))
+            INSERT INTO sensor_data (user_id, heart_rate, oxygen_level, temperature, activity_level, ecg_value)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (user_id, heart_rate, oxygen_level, temperature, activity_level, ecg_values))
 
-        # Simpan data ECG sebagai JSON atau per baris
-        for ecg_value in ecg_values:
-            cursor.execute("""
-                INSERT INTO ecg_data (user_id, ecg_value, timestamp)
-                VALUES (%s, %s, NOW())
-            """, (user_id, ecg_value))
-
+        check_date = datetime.now().date()
+        cursor.execute("UPDATE health_checks SET completed = TRUE WHERE user_id = %s AND check_date = %s", (user_id, check_date))
         connection.commit()
         return jsonify({"status": "sukses"})
     except mysql.connector.errors.IntegrityError as e:
@@ -290,27 +302,30 @@ def request_sensor_data():
     sensor = request.json.get('sensor')
     user_id = current_user.id
 
+    current_app.logger.debug(f"Requesting sensor data for sensor: {sensor}")
+
     try:
         response = requests.get(f'http://{esp32_ip}/get_sensor_data/{sensor}')
-        data = response.json()
+        current_app.logger.debug(f"Response from ESP32: {response.status_code}, {response.text}")
 
         if response.status_code == 200:
-            if 'value' not in data:
-                current_app.logger.error(f"Key 'value' not found in response: {data}")
-                return jsonify({'status': 'gagal', 'message': 'Data not available yet'}), 500
-
-            connection = get_db()
-            cursor = connection.cursor()
-            cursor.execute(f"""
-                INSERT INTO sensor_data (user_id, {sensor})
-                VALUES (%s, %s)
-                ON DUPLICATE KEY UPDATE {sensor} = %s
-            """, (user_id, data['value'], data['value']))
-            connection.commit()
-            cursor.close()
-            return jsonify({'status': 'sukses', sensor: data['value']})
+            data = response.json()
+            if sensor == 'ecg' and isinstance(data['value'], list):
+                # Handle ECG data
+                connection = get_db()
+                cursor = connection.cursor()
+                cursor.execute("""
+                    INSERT INTO sensor_data (user_id, ecg_value)
+                    VALUES (%s, %s)
+                    ON DUPLICATE KEY UPDATE ecg_value = %s
+                """, (user_id, data['value'], data['value']))
+                connection.commit()
+                cursor.close()
+                return jsonify({'status': 'sukses'})
+            else:
+                return jsonify({'status': 'gagal', 'message': 'Data ECG tidak valid'}), 400
         else:
-            return jsonify({'status': 'gagal', 'message': data['message']}), 400
+            return jsonify({'status': 'gagal', 'message': 'ESP32 tidak merespons dengan benar'}), 400
     except Exception as e:
         current_app.logger.error(f"Error processing sensor data: {str(e)}")
         return jsonify({'status': 'gagal', 'message': str(e)}), 500
