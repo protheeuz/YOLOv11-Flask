@@ -280,7 +280,7 @@ void setup() {
       request->send(200, "application/json", "{\"status\":\"sukses\", \"message\":\"ECG collection started\"}");
     } else if (millis() >= endMillis) {
       // Cek apakah data sudah terkumpul sepenuhnya
-      if (ecgData.size() > 0) {
+      if (ecgData.size() > 50) {  // Menambahkan syarat minimal data yang terkumpul
         DynamicJsonDocument doc(4096);
         doc["status"] = "sukses";
         doc["user_id"] = user_id;
@@ -294,16 +294,15 @@ void setup() {
         serializeJson(doc, jsonResponse);
         request->send(200, "application/json", jsonResponse);
       } else {
-        request->send(400, "application/json", "{\"status\":\"gagal\", \"message\":\"No ECG data collected\"}");
+        request->send(400, "application/json", "{\"status\":\"gagal\", \"message\":\"Data ECG tidak cukup terkumpul\"}");
       }
       ecgData.clear();
       ecgCollecting = false;
       ecgTicker.detach();
     } else {
-      request->send(400, "application/json", "{\"status\":\"gagal\", \"message\":\"ECG collection still in progress or no data\"}");
+      request->send(400, "application/json", "{\"status\":\"gagal\", \"message\":\"Pengumpulan data ECG masih berlangsung atau tidak ada data\"}");
     }
   });
-
 
   server.begin();
 }
@@ -347,43 +346,9 @@ void loop() {
 
 void collectECG() {
   ecg_value = analogRead(AD8232_OUTPUT);
+  Serial.print("ECG Value: ");
+  Serial.println(ecg_value);
   if (ecg_value < 4095) {  // Hanya simpan data yang valid
     ecgData.push_back(ecg_value);
   }
-}
-
-void sendECGData() {
-  if (user_id == -1) {
-    Serial.println("Error: Invalid user_id. Data not sent.");
-    return;
-  }
-
-  DynamicJsonDocument doc(4096);
-  doc["status"] = "sukses";
-  doc["user_id"] = user_id;  // Pastikan user_id dikirim
-  JsonArray data = doc.createNestedArray("value");
-
-  for (int value : ecgData) {
-    data.add(value);
-  }
-
-  String jsonResponse;
-  serializeJson(doc, jsonResponse);
-
-  HTTPClient http;
-  http.begin("http://192.168.20.136:5000/sensor_data");
-  http.addHeader("Content-Type", "application/json");
-
-  int httpResponseCode = http.POST(jsonResponse);
-
-  if (httpResponseCode > 0) {
-    String response = http.getString();
-    Serial.println(httpResponseCode);
-    Serial.println(response);
-  } else {
-    Serial.print("Error on sending POST: ");
-    Serial.println(httpResponseCode);
-  }
-
-  http.end();
 }

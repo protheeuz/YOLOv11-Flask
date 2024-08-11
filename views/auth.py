@@ -234,9 +234,15 @@ def login():
                     check_date = datetime.now().date()
                     cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_data[0], check_date))
                     health_check = cursor.fetchone()
-                    cursor.close()
 
                     if not health_check or not health_check[0]:
+                        # Jika pengecekan belum selesai, panggil proses pengecekan lagi
+                        cursor.execute("""
+                            INSERT INTO health_checks (user_id, check_date, completed)
+                            VALUES (%s, %s, %s)
+                            ON DUPLICATE KEY UPDATE completed = VALUES(completed)
+                        """, (user_data[0], check_date, False))
+                        connection.commit()
                         return jsonify({"status": "health_check_required", "user_id": user_data[0]})
 
                     return jsonify({"status": "sukses", "user_id": user_data[0]})
@@ -300,7 +306,7 @@ def login_face():
                 health_check = cursor.fetchone()
                 cursor.close()
 
-                if not health_check or not health_check[0]:
+                if not health_check atau not health_check[0]:
                     return jsonify({"status": "health_check_required", "user_id": user_id})
 
                 return jsonify({"status": "sukses", "user_id": user_id})

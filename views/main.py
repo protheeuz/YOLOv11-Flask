@@ -1,3 +1,4 @@
+import json
 from flask import Blueprint, flash, render_template, redirect, url_for, request, jsonify, current_app, session
 from flask_login import login_required, current_user, login_user
 from database import get_db
@@ -176,6 +177,49 @@ def index():
                                ecg_values=ecg_values,
                                ecg_timestamps=ecg_timestamps,
                                health_status=health_status)
+        
+@main_bp.route('/index_karyawan')
+@login_required
+def index_karyawan():
+    # Cek apakah pengecekan kesehatan sudah selesai hari ini
+    connection = get_db()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT completed FROM health_checks
+        WHERE user_id = %s AND check_date = CURDATE()
+    """, (current_user.id,))
+    health_check = cursor.fetchone()
+    
+    if health_check and health_check[0]:  # Pengecekan sudah selesai
+        return render_template('home/index_karyawan.html')
+
+    # Jika belum selesai, lanjutkan dengan pengecekan kesehatan
+    health_status = get_health_check_status(current_user.id)
+    cursor.execute("""
+        SELECT heart_rate, oxygen_level, temperature, activity_level 
+        FROM sensor_data
+        WHERE user_id = %s ORDER BY timestamp DESC LIMIT 1
+    """, (current_user.id,))
+    latest_health_data = cursor.fetchone()
+
+    cursor.execute("""
+        SELECT ecg_value, timestamp 
+        FROM sensor_data
+        WHERE user_id = %s ORDER BY timestamp DESC
+    """, (current_user.id,))
+    ecg_data = cursor.fetchall()
+
+    cursor.close()
+
+    ecg_values = [data[0] for data in ecg_data]
+    ecg_timestamps = [data[1].strftime('%H:%M:%S') for data in ecg_data]
+
+    return render_template('home/index_karyawan.html',
+                           latest_health_data=latest_health_data,
+                           ecg_values=ecg_values,
+                           ecg_timestamps=ecg_timestamps,
+                           health_status=health_status)
 
 @main_bp.route('/notifications')
 @login_required
@@ -284,9 +328,30 @@ def sensor_data():
             VALUES (%s, %s, %s, %s, %s, %s)
         """, (user_id, heart_rate, oxygen_level, temperature, activity_level, ecg_values))
 
-        check_date = datetime.now().date()
-        cursor.execute("UPDATE health_checks SET completed = TRUE WHERE user_id = %s AND check_date = %s", (user_id, check_date))
         connection.commit()
+
+        # Cek apakah semua data sensor sudah terisi
+        cursor.execute("""
+            SELECT 
+                MAX(CASE WHEN heart_rate IS NOT NULL THEN 1 ELSE 0 END) AS heart_rate_filled,
+                MAX(CASE WHEN oxygen_level IS NOT NULL THEN 1 ELSE 0 END) AS oxygen_level_filled,
+                MAX(CASE WHEN temperature IS NOT NULL THEN 1 ELSE 0 END) AS temperature_filled,
+                MAX(CASE WHEN activity_level IS NOT NULL THEN 1 ELSE 0 END) AS activity_level_filled,
+                MAX(CASE WHEN ecg_value IS NOT NULL THEN 1 ELSE 0 END) AS ecg_filled
+            FROM sensor_data
+            WHERE user_id = %s
+        """, (user_id,))
+        sensor_status = cursor.fetchone()
+
+        if all(sensor_status):
+            check_date = datetime.now().date()
+            cursor.execute("""
+                INSERT INTO health_checks (user_id, check_date, completed)
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE completed = 1
+            """, (user_id, check_date, 1))
+            connection.commit()
+
         return jsonify({"status": "sukses"})
     except mysql.connector.errors.IntegrityError as e:
         connection.rollback()
@@ -308,24 +373,68 @@ def request_sensor_data():
         response = requests.get(f'http://{esp32_ip}/get_sensor_data/{sensor}')
         current_app.logger.debug(f"Response from ESP32: {response.status_code}, {response.text}")
 
-        if response.status_code == 200:
+        # Periksa apakah response berupa JSON
+        try:
             data = response.json()
-            if sensor == 'ecg' and isinstance(data['value'], list):
-                # Handle ECG data
-                connection = get_db()
-                cursor = connection.cursor()
-                cursor.execute("""
-                    INSERT INTO sensor_data (user_id, ecg_value)
-                    VALUES (%s, %s)
-                    ON DUPLICATE KEY UPDATE ecg_value = %s
-                """, (user_id, data['value'], data['value']))
-                connection.commit()
-                cursor.close()
-                return jsonify({'status': 'sukses'})
+        except ValueError:
+            current_app.logger.error(f"Invalid JSON received: {response.text}")
+            return jsonify({'status': 'gagal', 'message': 'Invalid JSON received from ESP32'}), 500
+
+        if response.status_code == 200:
+            if 'user_id' in data and data['user_id'] != user_id:
+                current_app.logger.error("Invalid user_id received.")
+                return jsonify({'status': 'gagal', 'message': 'Invalid user_id'}), 400
+
+            connection = get_db()
+            cursor = connection.cursor()
+
+            if sensor == 'ecg':
+                if isinstance(data.get('value'), list):
+                    ecg_values_json = json.dumps(data['value'])
+
+                    cursor.execute("""
+                        INSERT INTO sensor_data (user_id, ecg_value)
+                        VALUES (%s, %s)
+                        ON DUPLICATE KEY UPDATE ecg_value = %s
+                    """, (user_id, ecg_values_json, ecg_values_json))
+                    connection.commit()
+
             else:
-                return jsonify({'status': 'gagal', 'message': 'Data ECG tidak valid'}), 400
-        else:
-            return jsonify({'status': 'gagal', 'message': 'ESP32 tidak merespons dengan benar'}), 400
+                sensor_value = data.get('value')
+                if sensor in ['heart_rate', 'oxygen_level', 'temperature', 'activity_level'] and sensor_value is not None:
+                    cursor.execute(f"""
+                        INSERT INTO sensor_data (user_id, {sensor})
+                        VALUES (%s, %s)
+                        ON DUPLICATE KEY UPDATE {sensor} = %s
+                    """, (user_id, sensor_value, sensor_value))
+                    connection.commit()
+
+            # Periksa apakah semua data sensor sudah tersedia
+            cursor.execute("""
+                SELECT heart_rate, oxygen_level, temperature, activity_level, ecg_value
+                FROM sensor_data
+                WHERE user_id = %s AND DATE(timestamp) = CURDATE()
+                ORDER BY timestamp DESC LIMIT 1
+            """, (user_id,))
+            health_data = cursor.fetchone()
+
+            if all(health_data):
+                cursor.execute("""
+                    INSERT INTO health_checks (user_id, check_date, completed)
+                    VALUES (%s, CURDATE(), 1)
+                    ON DUPLICATE KEY UPDATE completed = 1
+                """, (user_id,))
+                connection.commit()
+
+                cursor.close()
+                # Redirect ke dashboard jika pengecekan kesehatan sudah lengkap
+                return redirect(url_for('main.index_karyawan'))
+
+            cursor.close()
+            return jsonify({'status': 'sukses', 'message': f'Data {sensor.capitalize()} berhasil disimpan'})
+
+        return jsonify({'status': 'gagal', 'message': 'ESP32 tidak merespons dengan benar'}), 400
+
     except Exception as e:
         current_app.logger.error(f"Error processing sensor data: {str(e)}")
         return jsonify({'status': 'gagal', 'message': str(e)}), 500

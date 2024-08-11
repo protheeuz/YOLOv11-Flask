@@ -494,7 +494,16 @@
                         },
                         body: JSON.stringify({ esp32_ip, sensor })
                     })
-                    .then(response => response.json())
+                    .then(response => {
+                        return response.text().then(text => {
+                            try {
+                                return JSON.parse(text);
+                            } catch (error) {
+                                console.error('Error parsing JSON:', text);
+                                throw new Error('Invalid JSON received');
+                            }
+                        });
+                    })
                     .then(data => {
                         console.log(`Data received for ${sensor}:`, data);
                         if (data.status === 'sukses') {
