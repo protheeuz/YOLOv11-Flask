@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Jul 27, 2024 at 09:59 AM
+-- Generation Time: Aug 11, 2024 at 04:34 PM
 -- Server version: 8.0.30
 -- PHP Version: 8.2.21
 
@@ -24,13 +24,26 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `ecg_data`
+--
+
+CREATE TABLE `ecg_data` (
+  `id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `ecg_value` json NOT NULL,
+  `timestamp` datetime DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `faces`
 --
 
 CREATE TABLE `faces` (
   `user_id` int DEFAULT NULL,
   `encoding` blob
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `faces`
@@ -52,13 +65,20 @@ CREATE TABLE `health_checks` (
   `user_id` int DEFAULT NULL,
   `check_date` date DEFAULT NULL,
   `completed` tinyint(1) DEFAULT '0'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `health_checks`
+--
+
+INSERT INTO `health_checks` (`id`, `user_id`, `check_date`, `completed`) VALUES
+(1, 14, '2024-08-11', 1);
 
 -- --------------------------------------------------------
 
 --
 -- Table structure for table `sensor_data`
---s
+--
 
 CREATE TABLE `sensor_data` (
   `id` int NOT NULL,
@@ -68,8 +88,19 @@ CREATE TABLE `sensor_data` (
   `oxygen_level` float DEFAULT NULL,
   `temperature` float DEFAULT NULL,
   `activity_level` float DEFAULT NULL,
-  `ecg_value` float DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `ecg_value` json DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `sensor_data`
+--
+
+INSERT INTO `sensor_data` (`id`, `user_id`, `timestamp`, `heart_rate`, `oxygen_level`, `temperature`, `activity_level`, `ecg_value`) VALUES
+(904, 14, '2024-08-11 13:20:34', 68, NULL, NULL, NULL, NULL),
+(905, 14, '2024-08-11 13:20:55', NULL, 94, NULL, NULL, NULL),
+(906, 14, '2024-08-11 13:21:10', NULL, NULL, 29.81, NULL, NULL),
+(907, 14, '2024-08-11 13:21:23', NULL, NULL, NULL, 8.18, NULL),
+(908, 14, '2024-08-11 13:22:51', NULL, NULL, NULL, NULL, '[481, 3232, 3622, 897, 1070, 500, 1399, 492, 633, 2638, 507, 509, 511, 2460, 486, 497, 483, 523, 528, 500, 687, 1516, 3568, 2209, 2496, 2627, 1139, 1680, 3278, 3556, 3408, 2359, 3214, 795, 1535, 3255, 3574, 2726, 505, 3382, 464, 498, 502, 496, 496, 496, 487, 2033, 739, 484, 496, 486, 3982, 1914, 3087, 1473, 2162, 496, 563, 507, 535, 497, 581, 561, 1047, 717, 562, 511, 496, 507, 482, 496, 484, 1100, 1089, 880, 489, 501, 479, 487, 1827, 1472, 2404, 525, 495, 1526, 497, 539, 534, 494, 531, 534, 538, 480, 500, 2452, 485, 497, 493, 484, 469, 479, 533, 555, 548, 495, 497, 493, 490, 474, 490, 477, 497, 473, 491, 2063, 502, 483, 496, 493, 495, 490, 496, 487, 482, 490, 499, 505, 506, 506, 491, 498, 493, 471, 479, 511, 528, 550, 535, 498, 496, 496, 490, 490, 464, 468, 499, 468, 497, 496, 474, 481, 490, 511, 481, 499, 510, 496, 477, 491, 485, 509, 500, 496, 480, 491, 501, 482, 507, 493, 533, 496, 539, 505, 489, 490, 546, 481, 535, 511, 531, 526, 476, 523, 499, 493, 491, 499, 487]');
 
 -- --------------------------------------------------------
 
@@ -90,20 +121,28 @@ CREATE TABLE `users` (
   `address` varchar(255) DEFAULT NULL,
   `about` text,
   `profile_image` varchar(255) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `users`
 --
 
 INSERT INTO `users` (`id`, `nik`, `name`, `email`, `password`, `last_login`, `registration_date`, `role`, `unique_code`, `address`, `about`, `profile_image`) VALUES
-(13, '140456', 'Iqbal Fauzien', 'iqbalfauzien@gmail.com', '$2b$12$pDVOni9P7KRCqkPfEL2Ia.ZBp0e3JWCxqlB68hisVfTTZ5GUzRXde', '2024-07-26 17:05:22', '2024-07-13 14:31:53', 'admin', '0720', 'Apartemen Sentra Latumenten, Grogol, Jakarta Barat.', 'the greatest ever;', 'uploads/Screenshot_2024-07-18_044555.png'),
-(14, '140234', 'Mukhlis Setyanto', 'rinoristantasurbakti@gmail.com', '$2b$12$oeUfSSxrRrTcPyODfwjc5OlkDdpnCeHg6ukXj7ma5KCO9sST9CeW.', '2024-07-13 21:08:11', '2024-07-13 21:07:20', 'karyawan', '8208', NULL, NULL, NULL),
-(15, '140333', 'Maulana', 'maulana@gmail.com', '$2b$12$GHvGO.9GkIFWudOAj6oxV.XtO2A7VfMLQx1G5A4487b1t7neBU4M2', NULL, '2024-07-16 12:14:04', 'karyawan', '8802', NULL, NULL, NULL);
+(13, '140456', 'Iqbal Fauzien', 'iqbalfauzien@gmail.com', '$2b$12$pDVOni9P7KRCqkPfEL2Ia.ZBp0e3JWCxqlB68hisVfTTZ5GUzRXde', '2024-08-11 11:53:40', '2024-07-13 14:31:53', 'admin', '0720', 'Apartemen Sentra Latumenten, Grogol, Jakarta Barat.', 'the greatest ever;', 'uploads/spf.jpeg'),
+(14, '140234', 'Mukhlis Setyanto', 'rinoristantasurbakti@gmail.com', '$2b$12$oeUfSSxrRrTcPyODfwjc5OlkDdpnCeHg6ukXj7ma5KCO9sST9CeW.', '2024-08-11 13:37:36', '2024-07-13 21:07:20', 'karyawan', '8208', 'Jl. Jalan Ke Depan', 'Sehat adalah segalanya', NULL),
+(15, '140333', 'Maulana', 'maulana@gmail.com', '$2b$12$GHvGO.9GkIFWudOAj6oxV.XtO2A7VfMLQx1G5A4487b1t7neBU4M2', NULL, '2024-07-16 12:14:04', 'karyawan', '8802', NULL, NULL, NULL),
+(18, '140123', 'Mathtech Headquarters', 'matimatech@gmail.com', '$2b$12$JHCPpQgACrL9lLXY3WWYxuxbcWcb1g1eWInDNc2sWBshJ03f7tlM.', '2024-08-05 08:27:03', '2024-08-05 08:26:44', 'admin', '1252', NULL, NULL, NULL);
 
 --
 -- Indexes for dumped tables
 --
+
+--
+-- Indexes for table `ecg_data`
+--
+ALTER TABLE `ecg_data`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`);
 
 --
 -- Indexes for table `faces`
@@ -138,26 +177,38 @@ ALTER TABLE `users`
 --
 
 --
+-- AUTO_INCREMENT for table `ecg_data`
+--
+ALTER TABLE `ecg_data`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `health_checks`
 --
 ALTER TABLE `health_checks`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `sensor_data`
 --
 ALTER TABLE `sensor_data`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=773;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=914;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `ecg_data`
+--
+ALTER TABLE `ecg_data`
+  ADD CONSTRAINT `ecg_data_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `faces`
