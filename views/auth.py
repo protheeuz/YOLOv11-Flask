@@ -230,25 +230,16 @@ def login():
                 if user_data[2] == 'admin':
                     return jsonify({"status": "sukses", "user_id": user_data[0]})
                 
-                if send_user_id_to_esp32(user_data[0], esp32_ip):
-                    check_date = datetime.now().date()
-                    cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_data[0], check_date))
-                    health_check = cursor.fetchone()
+                # Tampilkan modal pengecekan kesehatan langsung
+                check_date = datetime.now().date()
+                cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_data[0], check_date))
+                health_check = cursor.fetchone()
 
-                    if not health_check or not health_check[0]:
-                        # Jika pengecekan belum selesai, panggil proses pengecekan lagi
-                        cursor.execute("""
-                            INSERT INTO health_checks (user_id, check_date, completed)
-                            VALUES (%s, %s, %s)
-                            ON DUPLICATE KEY UPDATE completed = VALUES(completed)
-                        """, (user_data[0], check_date, False))
-                        connection.commit()
-                        return jsonify({"status": "health_check_required", "user_id": user_data[0]})
-
-                    return jsonify({"status": "sukses", "user_id": user_data[0]})
+                if not health_check or not health_check[0]:
+                    return jsonify({"status": "health_check_required", "user_id": user_data[0]})
                 else:
-                    return jsonify({"status": "gagal", "message": "Gagal mengirim user_id ke ESP 32"})
-
+                    return jsonify({"status": "sukses", "user_id": user_data[0]})
+                    
         cursor.close()
         return jsonify({"status": "gagal", "message": "NIK atau password salah"})
 
@@ -272,10 +263,19 @@ def login_face():
     faces = face_cascade.detectMultiScale(gray, 1.1, 4)
 
     if len(faces) == 0:
+        logging.error("Tidak ada wajah yang terdeteksi.")
         return jsonify({"status": "gagal", "pesan": "Tidak ada wajah yang terdeteksi"}), 400
 
     try:
-        result = DeepFace.represent(frame, model_name='Facenet', enforce_detection=False)
+        # Potong wajah dari frame untuk representasi lebih akurat
+        (x, y, w, h) = faces[0]  # Ambil wajah pertama yang terdeteksi
+        face_frame = frame[y:y+h, x:x+w]
+        
+        result = DeepFace.represent(face_frame, model_name='Facenet', enforce_detection=False)
+        if not result:
+            logging.error("DeepFace gagal menghasilkan representasi wajah.")
+            return jsonify({"status": "gagal", "pesan": "Wajah tidak dikenali"}), 400
+        
         face_encoding = result[0]["embedding"]
 
         user_id = recognize_face(face_encoding)
@@ -296,27 +296,25 @@ def login_face():
             # Simpan status kesehatan di sesi
             session['health_status'] = get_health_check_status(user_id)
 
-            # Skip health check if the user is an admin
             if user_role == 'admin':
                 return jsonify({"status": "sukses", "user_id": user_id})
 
-            if send_user_id_to_esp32(user_id, '192.168.20.184'):
-                check_date = datetime.now().date()
-                cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
-                health_check = cursor.fetchone()
-                cursor.close()
+            # Tampilkan modal pengecekan kesehatan langsung
+            check_date = datetime.now().date()
+            cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
+            health_check = cursor.fetchone()
+            cursor.close()
 
-                if not health_check or not health_check[0]:
-                    return jsonify({"status": "health_check_required", "user_id": user_id})
+            if not health_check or not health_check[0]:
+                return jsonify({"status": "health_check_required", "user_id": user_id})
 
-                return jsonify({"status": "sukses", "user_id": user_id})
-            else:
-                return jsonify({"status": "gagal", "message": "Gagal mengirim user_id ke ESP 32"})
-
+            return jsonify({"status": "sukses", "user_id": user_id})
         else:
+            logging.warning("Wajah tidak dikenali oleh sistem.")
             return jsonify({"status": "gagal", "pesan": "Wajah tidak dikenali"}), 401
     except Exception as e:
-        return jsonify({"status": "gagal", "pesan": "Tidak ada wajah yang ditemukan"}), 400
+        logging.exception("Terjadi kesalahan saat mencoba mengenali wajah.")
+        return jsonify({"status": "gagal", "pesan": "Terjadi kesalahan pada sistem"}), 400
 
 @auth_bp.route('/login_qr', methods=['POST'])
 def login_qr():
@@ -342,25 +340,18 @@ def login_qr():
             session['user_id'] = user_id
             session['session_token'] = generate_session_token()
 
-            # Simpan status kesehatan di sesi
-            session['health_status'] = get_health_check_status(user_id)
+            # Hanya lakukan pengecekan ke ESP32 setelah login berhasil
+            # Cek apakah pengecekan kesehatan diperlukan
+            check_date = datetime.now().date()
+            cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
+            health_check = cursor.fetchone()
+            cursor.close()
 
-            # Skip health check if the user is an admin
-            if user_role == 'admin':
-                return jsonify({"status": "sukses", "user_id": user_id})
+            if not health_check or not health_check[0]:
+                return jsonify({"status": "health_check_required", "user_id": user_id})
 
-            if send_user_id_to_esp32(user_id, '192.168.20.184'):
-                check_date = datetime.now().date()
-                cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
-                health_check = cursor.fetchone()
-                cursor.close()
-
-                if not health_check or not health_check[0]:
-                    return jsonify({"status": "health_check_required", "user_id": user_id})
-
-                return jsonify({"status": "sukses", "user_id": user_id})
-            else:
-                return jsonify({"status": "gagal", "message": "Gagal mengirim user_id ke ESP 32"})
+            # Jika user adalah admin atau pengecekan kesehatan sudah dilewati, langsung login
+            return jsonify({"status": "sukses", "user_id": user_id})
         else:
             cursor.close()
             return jsonify({"status": "gagal", "pesan": "Kode unik tidak valid"}), 401

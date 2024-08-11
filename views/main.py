@@ -150,8 +150,8 @@ def index():
                 MAX(CASE WHEN temperature IS NOT NULL THEN temperature ELSE NULL END) AS temperature,
                 MAX(CASE WHEN activity_level IS NOT NULL THEN activity_level ELSE NULL END) AS activity_level
             FROM sensor_data
-            WHERE user_id = %s AND DATE(timestamp) = CURDATE()
-        """, (current_user.id,))
+            WHERE user_id = %s AND DATE(timestamp) = (SELECT MAX(DATE(timestamp)) FROM sensor_data WHERE user_id = %s)
+        """, (current_user.id, current_user.id))
         latest_health_data = cursor.fetchone()
 
         cursor.execute("""
@@ -211,8 +211,8 @@ def index_karyawan():
             MAX(CASE WHEN temperature IS NOT NULL THEN temperature ELSE NULL END) AS temperature,
             MAX(CASE WHEN activity_level IS NOT NULL THEN activity_level ELSE NULL END) AS activity_level
         FROM sensor_data
-        WHERE user_id = %s AND DATE(timestamp) = CURDATE()
-    """, (current_user.id,))
+        WHERE user_id = %s AND DATE(timestamp) = (SELECT MAX(DATE(timestamp)) FROM sensor_data WHERE user_id = %s)
+    """, (current_user.id, current_user.id))
     latest_health_data = cursor.fetchone()
 
     cursor.execute("""
@@ -251,10 +251,15 @@ def index_karyawan():
                            ecg_timestamps=ecg_timestamps,
                            health_status=health_status)
 
+@main_bp.route('/skip_health_check', methods=['POST'])
+@login_required
+def skip_health_check():
+    return jsonify({"status": "sukses", "redirect": url_for('main.index_karyawan')})
+
 @main_bp.route('/notifications')
 @login_required
 def notifications():
-    if current_user.role != 'admin':
+    if (current_user.role != 'admin'):
         return jsonify({"error": "Unauthorized"}), 403
 
     new_notifications = get_new_logins_for_admin()
