@@ -244,48 +244,39 @@
                 .then(function (stream) {
                     video.srcObject = stream;
                     video.play();
-                    
                     setTimeout(function() {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-                        
-                        canvas.toBlob(function(blob) {
-                            const formData = new FormData();
-                            formData.append('face_image', blob);
-
-                            fetch('{{ url_for("auth.login_face") }}', {
-                                method: 'POST',
-                                body: formData
-                            })
-                            .then(response => response.json())
-                            .then(data => {
-                                if (data.status === 'sukses') {
-                                    document.getElementById('face-login-modal').style.display = 'none'; // Tutup modal
-                                    window.location.href = data.redirect; // Arahkan ke dashboard yang sesuai
-                                } else if (data.status === 'health_check_required') {
-                                    document.getElementById('face-login-modal').style.display = 'none'; // Tutup modal
-                                    $('#healthCheckModal').modal('show');
-                                    updateHealthCheckSteps();
-                                } else {
-                                    alert('Login wajah gagal: ' + data.pesan);
-                                }
-                            })
-                            .catch(error => {
-                                console.error('Error:', error);
-                                alert('Terjadi kesalahan saat memproses login wajah.');
-                            })
-                            .finally(() => {
-                                document.getElementById('loading-login').style.display = 'none';
-                            });
-                        }, 'image/png');
-                        
-                    }, 3000); // Tambahkan penundaan jika diperlukan
+                        document.getElementById('loading-login').style.display = 'block';
+                        fetch('{{ url_for("auth.login_face") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'sukses') {
+                                // Tutup modal dan arahkan ke dashboard yang sesuai
+                                document.getElementById('face-login-modal').style.display = 'none';
+                                window.location.href = data.redirect;
+                            } else if (data.status === 'health_check_required') {
+                                // Tutup modal login wajah dan buka modal pengecekan kesehatan
+                                document.getElementById('face-login-modal').style.display = 'none';
+                                $('#healthCheckModal').modal('show');
+                                updateHealthCheckSteps(data.user_id);
+                            } else {
+                                alert('Login wajah gagal: ' + data.pesan);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                        })
+                        .finally(() => {
+                            document.getElementById('loading-login').style.display = 'none';
+                        });
+                    }, 3000);
                 })
                 .catch(function (error) {
                     console.log("Something went wrong!");
-                    alert('Gagal mengakses kamera.');
                 });
         }
     });
@@ -309,16 +300,15 @@
     });
 
     document.getElementById('qrLoginBtn').addEventListener('click', function() {
-    const nik = document.getElementById('nik').value;
-    if (!nik) {
-        document.getElementById('error-message').innerText = 'Silakan masukkan NIK terlebih dahulu.';
-        document.getElementById('error-message').style.display = 'block';
-        return;
-    }
+        const nik = document.getElementById('nik').value;
+        if (!nik) {
+            document.getElementById('error-message').innerText = 'Silakan masukkan NIK terlebih dahulu.';
+            document.getElementById('error-message').style.display = 'block';
+            return;
+        }
 
-    document.getElementById('error-message').style.display = 'none';
-    
-        // Tampilkan QR Code tanpa menunggu koneksi ke ESP32
+        document.getElementById('error-message').style.display = 'none';
+        
         fetch('{{ url_for("auth.generate_qr") }}?nik=' + nik)
         .then(response => {
             if (!response.ok) {
@@ -343,7 +333,6 @@
     document.getElementById('submitCodeBtn').addEventListener('click', function() {
         const userCode = document.getElementById('userCode').value;
         if (userCode) {
-            // Login QR Code tanpa menunggu koneksi ke ESP32
             fetch('{{ url_for("auth.login_qr") }}', {
                 method: 'POST',
                 headers: {
@@ -354,10 +343,10 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'sukses') {
-                    checkHealthStatus(data.user_id, 'admin');
+                    window.location.href = data.redirect;
                 } else if (data.status === 'health_check_required') {
                     $('#healthCheckModal').modal('show');
-                    updateHealthCheckSteps();
+                    updateHealthCheckSteps(data.user_id);
                 } else {
                     alert('Login QR Code gagal: ' + (data.pesan || 'Tidak diketahui.'));
                 }

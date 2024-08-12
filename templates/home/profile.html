@@ -158,7 +158,7 @@
                                         <h5>Tambah Admin Baru</h5>
                                     </div>
                                     <div class="card-block">
-                                        <form action="{{ url_for('auth.register') }}" method="post" id="newAdminForm">
+                                        <form action="{{ url_for('auth.register_admin') }}" method="post" id="newAdminForm">
                                             <div class="row">
                                                 <div class="col-sm-6 mb-4">
                                                     <div class="form-group">
@@ -188,7 +188,6 @@
                                                                placeholder="Masukkan kata sandi" required>
                                                     </div>
                                                 </div>
-                                                <input type="hidden" name="role" value="admin">
                                                 <div class="col-sm-12 mb-4">
                                                     <div class="form-group">
                                                         <button type="submit" class="btn btn-primary">Daftarkan Admin</button>
@@ -203,7 +202,7 @@
                         {% endif %}
 
                         <div id="face-register-modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="faceRegisterModalLabel" aria-hidden="true">
-                            <div class="modal-dialog" role="document">
+                            <div class="modal-dialog modal-lg" role="document">
                                 <div class="modal-content">
                                     <div class="modal-header">
                                         <h5 class="modal-title" id="faceRegisterModalLabel">Registrasi Wajah</h5>
@@ -211,13 +210,16 @@
                                             <span aria-hidden="true">&times;</span>
                                         </button>
                                     </div>
-                                    <div class="modal-body">
-                                        <div style="position: relative; display: inline-block;">
-                                            <video id="register-video" width="640" height="480" autoplay></video>
-                                            <div class="face-box"></div>
-                                            <div class="scan-line"></div>
-                                            <div id="loading-register">Sedang memproses wajah...</div>
-                                        </div>
+                                    <div class="modal-body text-center">
+                                        <form id="faceRegisterForm" enctype="multipart/form-data">
+                                            <div style="position: relative; display: inline-block;">
+                                                <video id="register-video" width="640" height="480" autoplay></video>
+                                                <div class="face-box"></div>
+                                                <div class="scan-line"></div>
+                                                <div id="loading-register" style="display:none;">Sedang memproses wajah...</div>
+                                            </div>
+                                            <button type="button" id="capture-face" class="btn btn-primary mt-3">Ambil Gambar Wajah</button>
+                                        </form>
                                     </div>
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
@@ -242,7 +244,8 @@
         document.getElementById('newAdminForm').addEventListener('submit', function (event) {
             event.preventDefault();
             const formData = new FormData(this);
-            fetch(this.action, {
+
+            fetch('{{ url_for("auth.register_admin") }}', {
                 method: 'POST',
                 body: formData
             })
@@ -250,52 +253,44 @@
             .then(data => {
                 if (data.status === 'sukses') {
                     $('#face-register-modal').modal('show');
-                    startFaceRegistration(data.user_id);
+                    window.localStorage.setItem('user_id', data.user_id);
                 } else {
-                    alert('Pendaftaran admin baru gagal: ' + data.message);
+                    alert('Pendaftaran admin baru gagal: ' + data.pesan);
                 }
             })
             .catch(error => console.error('Error:', error));
         });
-    });
 
-    function startFaceRegistration(user_id) {
-        const video = document.getElementById('register-video');
-        if (navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(function (stream) {
-                    video.srcObject = stream;
-                    video.play();
-                    setTimeout(function() {
-                        document.getElementById('loading-register').style.display = 'block';
-                        fetch('{{ url_for("auth.register_face") }}', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ user_id: user_id })
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.status === 'sukses') {
-                                alert('Admin baru berhasil didaftarkan');
-                                window.location.reload();
-                            } else {
-                                alert('Pendaftaran wajah gagal: ' + data.pesan);
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error:', error);
-                        })
-                        .finally(() => {
-                            document.getElementById('loading-register').style.display = 'none';
-                        });
-                    }, 3000);
+        document.getElementById('capture-face').addEventListener('click', function () {
+            const video = document.getElementById('register-video');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(function (blob) {
+                const formData = new FormData();
+                formData.append('face_image', blob);
+                formData.append('user_id', window.localStorage.getItem('user_id'));
+
+                fetch('{{ url_for("auth.register_face") }}', {
+                    method: 'POST',
+                    body: formData
                 })
-                .catch(function (error) {
-                    console.log("Something went wrong!");
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'sukses') {
+                        alert('Admin baru berhasil didaftarkan');
+                        window.location.reload();
+                    } else {
+                        alert('Pendaftaran wajah gagal: ' + data.pesan);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
                 });
-        }
-    }
+            }, 'image/png');
+        });
+    });
 </script>
 {% endblock javascripts %}

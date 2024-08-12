@@ -194,6 +194,38 @@ def register_face():
         logging.exception("Terjadi kesalahan saat memproses wajah")
         return jsonify({"status": "gagal", "pesan": "Wajah tidak ditemukan"}), 400
 
+@auth_bp.route('/register_admin', methods=['POST'])
+@login_required
+def register_admin():
+    if request.method == 'POST' and current_user.role == 'admin':
+        nik = request.form['nik']
+        name = request.form['name']
+        email = request.form['email']
+        password = request.form['password']
+        role = 'admin'  # Specify admin role
+        registration_date = datetime.now()
+        unique_code = generate_unique_code()
+
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+        connection = get_db()
+        cursor = connection.cursor()
+        
+        cursor.execute("SELECT id FROM users WHERE nik=%s OR email=%s", (nik, email))
+        existing_user = cursor.fetchone()
+        if existing_user:
+            cursor.close()
+            return jsonify({"status": "gagal", "pesan": "NIK atau Email sudah terdaftar"}), 400
+
+        cursor.execute("INSERT INTO users (nik, name, email, password, registration_date, role, unique_code) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                       (nik, name, email, hashed_password, registration_date, role, unique_code))
+        connection.commit()
+        user_id = cursor.lastrowid
+        cursor.close()
+
+        return jsonify({"status": "sukses", "user_id": user_id})
+    return jsonify({"status": "gagal", "pesan": "Anda tidak diizinkan untuk menambahkan admin"}), 403
+
 @auth_bp.route('/login', methods=['POST', 'GET'])
 def login():
     if request.method == 'POST':
@@ -218,13 +250,11 @@ def login():
                 cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_data[0],))
                 connection.commit()
 
-                # Simpan status kesehatan di sesi
                 session['health_status'] = get_health_check_status(user_data[0])
 
                 if user_data[2] == 'admin':
                     return jsonify({"status": "sukses", "user_id": user_data[0]})
                 
-                # Tampilkan modal pengecekan kesehatan langsung
                 check_date = datetime.now().date()
                 cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_data[0], check_date))
                 health_check = cursor.fetchone()
@@ -285,11 +315,18 @@ def login_face():
 
             cursor.close()
 
-            # Tutup modal dan arahkan ke dashboard yang sesuai
             if user_role == 'admin':
-                return jsonify({"status": "sukses", "redirect": url_for('main.index')})
+                return jsonify({"status": "sukses", "role": "admin", "redirect": url_for('main.index')})
             else:
-                return jsonify({"status": "sukses", "redirect": url_for('main.index_karyawan')})
+                check_date = datetime.now().date()
+                cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
+                health_check = cursor.fetchone()
+                cursor.close()
+
+                if not health_check or not health_check[0]:
+                    return jsonify({"status": "health_check_required", "role": "karyawan", "user_id": user_id})
+                else:
+                    return jsonify({"status": "sukses", "role": "karyawan", "redirect": url_for('main.index_karyawan')})
         else:
             logging.error("Wajah tidak dikenali")
             return jsonify({"status": "gagal", "pesan": "Wajah tidak dikenali"}), 401
@@ -321,8 +358,6 @@ def login_qr():
             session['user_id'] = user_id
             session['session_token'] = generate_session_token()
 
-            # Hanya lakukan pengecekan ke ESP32 setelah login berhasil
-            # Cek apakah pengecekan kesehatan diperlukan
             check_date = datetime.now().date()
             cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
             health_check = cursor.fetchone()
@@ -331,7 +366,6 @@ def login_qr():
             if not health_check or not health_check[0]:
                 return jsonify({"status": "health_check_required", "user_id": user_id})
 
-            # Jika user adalah admin atau pengecekan kesehatan sudah dilewati, langsung login
             return jsonify({"status": "sukses", "user_id": user_id})
         else:
             cursor.close()
