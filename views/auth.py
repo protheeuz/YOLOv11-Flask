@@ -141,7 +141,7 @@ def register():
         name = request.form['name']
         email = request.form['email']
         password = request.form['password']
-        role = request.form.get('role', 'karyawan')  # Set default role to 'karyawan' if not provided
+        role = 'karyawan'  
         registration_date = datetime.now()
         unique_code = generate_unique_code()
 
@@ -156,48 +156,42 @@ def register():
             cursor.close()
             return jsonify({"status": "gagal", "pesan": "NIK atau Email sudah terdaftar"}), 400
 
+        # Simpan data pengguna baru ke tabel users terlebih dahulu
         cursor.execute("INSERT INTO users (nik, name, email, password, registration_date, role, unique_code) VALUES (%s, %s, %s, %s, %s, %s, %s)",
                        (nik, name, email, hashed_password, registration_date, role, unique_code))
         connection.commit()
         user_id = cursor.lastrowid
         cursor.close()
 
+        # Kirimkan user_id kembali ke klien untuk digunakan saat mendaftarkan wajah
         return jsonify({"status": "sukses", "user_id": user_id})
     return render_template('auth/register.html')
 
 @auth_bp.route('/register_face', methods=['POST'])
 def register_face():
-    data = request.get_json()
-    user_id = data.get('user_id')
-    
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-    if not cap.isOpened():
-        return jsonify({"status": "gagal", "pesan": "Tidak dapat mengakses kamera"}), 400
+    face_image = request.files['face_image']
+    user_id = request.form['user_id']
 
-    ret, frame = cap.read()
-    cap.release()
+    if not user_id:
+        logging.error("User ID is missing in register_face.")
+        return jsonify({"status": "gagal", "pesan": "User ID tidak ditemukan"}), 400
 
-    if not ret:
-        return jsonify({"status": "gagal", "pesan": "Tidak dapat mengambil frame dari kamera"}), 400
-
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-
-    if len(faces) == 0:
-        return jsonify({"status": "gagal", "pesan": "Tidak ada wajah yang terdeteksi"}), 400
+    npimg = np.frombuffer(face_image.read(), np.uint8)
+    img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
 
     try:
-        result = DeepFace.represent(frame, model_name='Facenet', enforce_detection=False)
+        result = DeepFace.represent(img, model_name='Facenet', enforce_detection=False)
         face_encoding = result[0]["embedding"]
-        
+
         connection = get_db()
         cursor = connection.cursor()
         cursor.execute("INSERT INTO faces (user_id, encoding) VALUES (%s, %s)", (user_id, encode_face(face_encoding)))
         connection.commit()
         cursor.close()
+
         return jsonify({"status": "sukses"})
     except Exception as e:
+        logging.exception("Terjadi kesalahan saat memproses wajah")
         return jsonify({"status": "gagal", "pesan": "Wajah tidak ditemukan"}), 400
 
 @auth_bp.route('/login', methods=['POST', 'GET'])
@@ -248,38 +242,33 @@ def login():
 
 @auth_bp.route('/login_face', methods=['POST'])
 def login_face():
+    logging.debug("Memulai proses login wajah")
+    
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     if not cap.isOpened():
+        logging.error("Tidak dapat mengakses kamera")
         return jsonify({"status": "gagal", "pesan": "Tidak dapat mengakses kamera"}), 400
 
     ret, frame = cap.read()
     cap.release()
 
     if not ret:
+        logging.error("Tidak dapat mengambil frame dari kamera")
         return jsonify({"status": "gagal", "pesan": "Tidak dapat mengambil frame dari kamera"}), 400
 
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-
-    if len(faces) == 0:
-        logging.error("Tidak ada wajah yang terdeteksi.")
-        return jsonify({"status": "gagal", "pesan": "Tidak ada wajah yang terdeteksi"}), 400
-
     try:
-        # Potong wajah dari frame untuk representasi lebih akurat
-        (x, y, w, h) = faces[0]  # Ambil wajah pertama yang terdeteksi
-        face_frame = frame[y:y+h, x:x+w]
-        
-        result = DeepFace.represent(face_frame, model_name='Facenet', enforce_detection=False)
-        if not result:
-            logging.error("DeepFace gagal menghasilkan representasi wajah.")
-            return jsonify({"status": "gagal", "pesan": "Wajah tidak dikenali"}), 400
+        logging.debug("Mengambil representasi wajah")
+        result = DeepFace.represent(frame, model_name='Facenet', enforce_detection=False)
+        if not result or "embedding" not in result[0]:
+            logging.error("DeepFace gagal mendeteksi wajah atau menghasilkan representasi wajah.")
+            return jsonify({"status": "gagal", "pesan": "Tidak ada wajah yang terdeteksi atau wajah tidak dikenali"}), 400
         
         face_encoding = result[0]["embedding"]
+        logging.debug(f"Representasi wajah berhasil diambil: {face_encoding}")
 
         user_id = recognize_face(face_encoding)
         if user_id:
+            logging.debug(f"Wajah dikenali, user_id: {user_id}")
             connection = get_db()
             cursor = connection.cursor()
             cursor.execute("SELECT role FROM users WHERE id=%s", (user_id,))
@@ -292,29 +281,21 @@ def login_face():
             
             session['user_id'] = user_id
             session['session_token'] = generate_session_token()
+            current_app.logger.debug(f'Session after login (face): {session.items()}')
 
-            # Simpan status kesehatan di sesi
-            session['health_status'] = get_health_check_status(user_id)
-
-            if user_role == 'admin':
-                return jsonify({"status": "sukses", "user_id": user_id})
-
-            # Tampilkan modal pengecekan kesehatan langsung
-            check_date = datetime.now().date()
-            cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
-            health_check = cursor.fetchone()
             cursor.close()
 
-            if not health_check or not health_check[0]:
-                return jsonify({"status": "health_check_required", "user_id": user_id})
-
-            return jsonify({"status": "sukses", "user_id": user_id})
+            # Tutup modal dan arahkan ke dashboard yang sesuai
+            if user_role == 'admin':
+                return jsonify({"status": "sukses", "redirect": url_for('main.index')})
+            else:
+                return jsonify({"status": "sukses", "redirect": url_for('main.index_karyawan')})
         else:
-            logging.warning("Wajah tidak dikenali oleh sistem.")
+            logging.error("Wajah tidak dikenali")
             return jsonify({"status": "gagal", "pesan": "Wajah tidak dikenali"}), 401
     except Exception as e:
-        logging.exception("Terjadi kesalahan saat mencoba mengenali wajah.")
-        return jsonify({"status": "gagal", "pesan": "Terjadi kesalahan pada sistem"}), 400
+        logging.exception("Terjadi kesalahan saat memproses wajah")
+        return jsonify({"status": "gagal", "pesan": "Terjadi kesalahan saat memproses wajah"}), 400
 
 @auth_bp.route('/login_qr', methods=['POST'])
 def login_qr():

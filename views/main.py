@@ -11,7 +11,6 @@ import mysql.connector
 
 main_bp = Blueprint('main', __name__)
 
-# Memeriksa status kesehatan langsung dari database saat memuat halaman
 def get_health_check_status(user_id):
     connection = get_db()
     cursor = connection.cursor()
@@ -57,6 +56,7 @@ def index():
     cursor = connection.cursor()
 
     if current_user.role == 'admin':
+        # Query untuk admin
         cursor.execute("""
             SELECT u.id, u.name, u.registration_date, h.completed 
             FROM users u
@@ -77,7 +77,6 @@ def index():
         """)
         daily_health_data_raw = cursor.fetchall()
 
-        # Get health checks for today, this week, and all
         today = datetime.now().date()
         start_of_week = today - timedelta(days=today.weekday())
 
@@ -110,13 +109,11 @@ def index():
 
         cursor.close()
 
-        # Process the data for charts
         health_check_labels = [stat[0].strftime('%d %b') for stat in daily_health_data_raw]
-        daily_health_data = [stat[1] * 100 for stat in daily_health_data_raw]  # Convert to percentage
+        daily_health_data = [stat[1] * 100 for stat in daily_health_data_raw]
         weekly_health_data = []
         monthly_health_data = []
 
-        # Calculate weekly and monthly averages
         for i in range(0, len(daily_health_data_raw), 7):
             weekly_avg = sum(d[1] for d in daily_health_data_raw[i:i+7]) / 7 * 100
             weekly_health_data.append(weekly_avg)
@@ -135,14 +132,12 @@ def index():
                                weekly_health_checks=weekly_health_checks,
                                all_health_checks=all_health_checks)
     else:
-        # Cek apakah pengecekan kesehatan sudah selesai hari ini
         cursor.execute("""
             SELECT completed FROM health_checks
             WHERE user_id = %s AND check_date = CURDATE()
         """, (current_user.id,))
         health_check = cursor.fetchone()
 
-        # Ambil data kesehatan terbaru dengan menggabungkan semua sensor dalam satu query
         cursor.execute("""
             SELECT 
                 MAX(CASE WHEN heart_rate IS NOT NULL THEN heart_rate ELSE NULL END) AS heart_rate,
@@ -150,8 +145,8 @@ def index():
                 MAX(CASE WHEN temperature IS NOT NULL THEN temperature ELSE NULL END) AS temperature,
                 MAX(CASE WHEN activity_level IS NOT NULL THEN activity_level ELSE NULL END) AS activity_level
             FROM sensor_data
-            WHERE user_id = %s AND DATE(timestamp) = (SELECT MAX(DATE(timestamp)) FROM sensor_data WHERE user_id = %s)
-        """, (current_user.id, current_user.id))
+            WHERE user_id = %s AND DATE(timestamp) = CURDATE()
+        """, (current_user.id,))
         latest_health_data = cursor.fetchone()
 
         cursor.execute("""
@@ -179,21 +174,26 @@ def index():
                 'activity_level': latest_health_data[3] or '-'
             }
 
-        ecg_values = [data[0] for data in ecg_data]
-        ecg_timestamps = [data[1].strftime('%H:%M:%S') for data in ecg_data]
+        # Memecah JSON ecg_value ke dalam list
+        ecg_values = []
+        ecg_timestamps = []
+        for ecg_record in ecg_data:
+            values = json.loads(ecg_record[0])  # Load JSON data
+            timestamp = ecg_record[1].strftime('%H:%M:%S')
+            ecg_values.extend(values)  # Add all values to the list
+            ecg_timestamps.extend([timestamp] * len(values))  # Repeat timestamp for each value
 
         health_status = get_health_check_status(current_user.id)
 
         return render_template('home/index_karyawan.html',
-                               latest_health_data=latest_health_data,
-                               ecg_values=ecg_values,
-                               ecg_timestamps=ecg_timestamps,
-                               health_status=health_status)
+                            latest_health_data=latest_health_data,
+                            ecg_values=ecg_values,
+                            ecg_timestamps=ecg_timestamps,
+                            health_status=health_status)
 
 @main_bp.route('/index_karyawan')
 @login_required
 def index_karyawan():
-    # Cek apakah pengecekan kesehatan sudah selesai hari ini
     connection = get_db()
     cursor = connection.cursor()
 
@@ -203,7 +203,6 @@ def index_karyawan():
     """, (current_user.id,))
     health_check = cursor.fetchone()
     
-    # Ambil data kesehatan terbaru dengan menggabungkan semua sensor dalam satu query
     cursor.execute("""
         SELECT 
             MAX(CASE WHEN heart_rate IS NOT NULL THEN heart_rate ELSE NULL END) AS heart_rate,
@@ -246,10 +245,10 @@ def index_karyawan():
     health_status = get_health_check_status(current_user.id)
 
     return render_template('home/index_karyawan.html',
-                           latest_health_data=latest_health_data,
-                           ecg_values=ecg_values,
-                           ecg_timestamps=ecg_timestamps,
-                           health_status=health_status)
+                        latest_health_data=latest_health_data,
+                        ecg_values=ecg_values,
+                        ecg_timestamps=ecg_timestamps,
+                        health_status=health_status)
 
 @main_bp.route('/skip_health_check', methods=['POST'])
 @login_required
@@ -259,7 +258,7 @@ def skip_health_check():
 @main_bp.route('/notifications')
 @login_required
 def notifications():
-    if (current_user.role != 'admin'):
+    if current_user.role != 'admin':
         return jsonify({"error": "Unauthorized"}), 403
 
     new_notifications = get_new_logins_for_admin()
@@ -357,7 +356,6 @@ def sensor_data():
     cursor = connection.cursor()
 
     try:
-        # Simpan data heart_rate, oxygen_level, temperature, dan activity_level
         cursor.execute("""
             INSERT INTO sensor_data (user_id, heart_rate, oxygen_level, temperature, activity_level, ecg_value)
             VALUES (%s, %s, %s, %s, %s, %s)
@@ -365,7 +363,6 @@ def sensor_data():
 
         connection.commit()
 
-        # Cek apakah semua data sensor sudah terisi
         cursor.execute("""
             SELECT 
                 MAX(CASE WHEN heart_rate IS NOT NULL THEN 1 ELSE 0 END) AS heart_rate_filled,
@@ -387,7 +384,6 @@ def sensor_data():
             """, (user_id, check_date, 1))
             connection.commit()
 
-            # Redirect ke dashboard setelah data lengkap
             return jsonify({"status": "sukses", "redirect": url_for('main.index_karyawan')})
 
         return jsonify({"status": "sukses"})
@@ -411,7 +407,6 @@ def request_sensor_data():
         response = requests.get(f'http://{esp32_ip}/get_sensor_data/{sensor}')
         current_app.logger.debug(f"Response from ESP32: {response.status_code}, {response.text}")
 
-        # Periksa apakah response berupa JSON
         try:
             data = response.json()
         except ValueError:
@@ -426,7 +421,6 @@ def request_sensor_data():
             connection = get_db()
             cursor = connection.cursor()
 
-            # Simpan data sensor
             if sensor == 'ecg':
                 if isinstance(data.get('value'), list):
                     ecg_values_json = json.dumps(data['value'])
@@ -448,7 +442,6 @@ def request_sensor_data():
                     """, (user_id, sensor_value, sensor_value))
                     connection.commit()
 
-            # Periksa apakah semua data sensor sudah tersedia
             cursor.execute("""
                 SELECT heart_rate, oxygen_level, temperature, activity_level, ecg_value
                 FROM sensor_data
@@ -466,7 +459,6 @@ def request_sensor_data():
                 connection.commit()
 
                 cursor.close()
-                # Redirect ke dashboard jika pengecekan kesehatan sudah lengkap
                 return jsonify({'status': 'sukses', 'redirect': url_for('main.index_karyawan')})
 
             cursor.close()
@@ -569,7 +561,6 @@ def employee_list():
 
     return render_template('home/employee_list.html', employees=employees)
 
-# Tambahan untuk pengiriman user_id dan session_token ke ESP32
 @main_bp.route('/auth/send_user_id', methods=['POST'])
 @login_required
 def send_user_id():

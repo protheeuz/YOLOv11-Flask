@@ -151,9 +151,8 @@
 <script>
     document.getElementById('startFaceRegistration').addEventListener('click', function() {
         const formData = new FormData(document.getElementById('registerForm'));
-        formData.append('role', 'karyawan');  // Set default role as karyawan
         
-        fetch('{{ url_for("auth.check_existing_user") }}', {
+        fetch('{{ url_for("auth.register") }}', {
             method: 'POST',
             body: formData
         })
@@ -164,7 +163,7 @@
             } else {
                 document.getElementById('error-message').innerText = '';
                 document.getElementById('face-register-modal').style.display = 'flex';
-                window.localStorage.setItem('registerFormData', JSON.stringify(Object.fromEntries(formData)));
+                window.localStorage.setItem('user_id', data.user_id);
                 
                 const video = document.getElementById('video');
                 if (navigator.mediaDevices.getUserMedia) {
@@ -195,11 +194,8 @@
 
         canvas.toBlob(function(blob) {
             const formData = new FormData();
-            const registerFormData = JSON.parse(window.localStorage.getItem('registerFormData'));
-            for (const key in registerFormData) {
-                formData.append(key, registerFormData[key]);
-            }
             formData.append('face_image', blob);
+            formData.append('user_id', window.localStorage.getItem('user_id'));
 
             fetch('{{ url_for("auth.register_face") }}', {
                 method: 'POST',

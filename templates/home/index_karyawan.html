@@ -12,9 +12,8 @@
             <div class="pcoded-inner-content">
                 <div class="main-body">
                     <div class="page-wrapper">
-                        <!-- [ Main Content ] start -->
                         <div class="row">
-                            <!-- [ Card Sections for Sensors ] start -->
+                            <!-- Sensor Data Cards -->
                             <div class="col-md-6 col-xl-4">
                                 <div class="card heart-rate">
                                     <div class="card-block">
@@ -29,6 +28,7 @@
                                     </div>
                                 </div>
                             </div>
+                            <!-- Oxygen Level -->
                             <div class="col-md-6 col-xl-4">
                                 <div class="card oxygen-level">
                                     <div class="card-block">
@@ -43,6 +43,7 @@
                                     </div>
                                 </div>
                             </div>
+                            <!-- Temperature -->
                             <div class="col-md-6 col-xl-4">
                                 <div class="card temperature">
                                     <div class="card-block">
@@ -57,6 +58,7 @@
                                     </div>
                                 </div>
                             </div>
+                            <!-- Activity Level -->
                             <div class="col-md-6 col-xl-4">
                                 <div class="card activity-level">
                                     <div class="card-block">
@@ -71,16 +73,16 @@
                                     </div>
                                 </div>
                             </div>
+                            <!-- ECG Graph -->
                             <div class="col-xl-12 col-md-12">
                                 <div class="card ecg-graph">
                                     <div class="card-block">
                                         <h6 class="mb-4">Grafik ECG</h6>
-                                        <div id="morris-line-smooth-chart" style="height:300px"></div>
+                                        <canvas id="ecgChart" width="400" height="200"></canvas>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <!-- [ Card Sections for Sensors ] end -->
                     </div>
                 </div>
             </div>
@@ -90,25 +92,35 @@
 {% endblock content %}
 
 {% block javascripts %}
-<script src="{{ url_for('static', filename='assets/plugins/chart-morris/js/raphael.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/plugins/chart-morris/js/morris.min.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<canvas id="ecgChart" width="600" height="400"></canvas>
 <script>
-    document.addEventListener('DOMContentLoaded', (event) => {
-        Morris.Line({
-            element: 'morris-line-smooth-chart',
-            data: [
-                {% for timestamp, value in ecg_data %}
-                { timestamp: '{{ timestamp }}', value: {{ value }} },
-                {% endfor %}
-            ],
-            xkey: 'timestamp',
-            ykeys: ['value'],
-            labels: ['ECG Value'],
-            smooth: true,
-            resize: true,
-            lineColors: ['#1de9b6'],
-            parseTime: false
-        });
+    const ctx = document.getElementById('ecgChart').getContext('2d');
+    const ecgChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ ecg_timestamps | tojson }},
+            datasets: [{
+                label: 'ECG Data',
+                data: {{ ecg_values | tojson }},
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1,
+                fill: false
+            }]
+        },
+        options: {
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: 'second'
+                    }
+                },
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
     });
 </script>
 {% endblock javascripts %}

@@ -244,40 +244,48 @@
                 .then(function (stream) {
                     video.srcObject = stream;
                     video.play();
+                    
                     setTimeout(function() {
-                        document.getElementById('loading-login').style.display = 'block';
-                        fetch('{{ url_for("auth.login_face") }}', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            }
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.status === 'sukses') {
-                                if (data.user_id) {
-                                    sendUserIdToESP32(data.user_id);
-                                    checkHealthStatus(data.user_id, 'admin');
+                        const canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+                        
+                        canvas.toBlob(function(blob) {
+                            const formData = new FormData();
+                            formData.append('face_image', blob);
+
+                            fetch('{{ url_for("auth.login_face") }}', {
+                                method: 'POST',
+                                body: formData
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.status === 'sukses') {
+                                    document.getElementById('face-login-modal').style.display = 'none'; // Tutup modal
+                                    window.location.href = data.redirect; // Arahkan ke dashboard yang sesuai
+                                } else if (data.status === 'health_check_required') {
+                                    document.getElementById('face-login-modal').style.display = 'none'; // Tutup modal
+                                    $('#healthCheckModal').modal('show');
+                                    updateHealthCheckSteps();
                                 } else {
-                                    alert('User ID tidak ditemukan.');
+                                    alert('Login wajah gagal: ' + data.pesan);
                                 }
-                            } else if (data.status === 'health_check_required') {
-                                $('#healthCheckModal').modal('show');
-                                updateHealthCheckSteps();
-                            } else {
-                                alert('Login wajah gagal: ' + data.pesan);
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error:', error);
-                        })
-                        .finally(() => {
-                            document.getElementById('loading-login').style.display = 'none';
-                        });
-                    }, 3000);
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                alert('Terjadi kesalahan saat memproses login wajah.');
+                            })
+                            .finally(() => {
+                                document.getElementById('loading-login').style.display = 'none';
+                            });
+                        }, 'image/png');
+                        
+                    }, 3000); // Tambahkan penundaan jika diperlukan
                 })
                 .catch(function (error) {
                     console.log("Something went wrong!");
+                    alert('Gagal mengakses kamera.');
                 });
         }
     });
