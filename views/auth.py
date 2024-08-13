@@ -482,15 +482,18 @@ def delete_user(user_id):
             connection.commit()
             cursor.close()
 
-            return jsonify({"status": "sukses", "pesan": "User berhasil dihapus dan dipindahkan ke tabel backup"})
+            flash('User berhasil dihapus dan dipindahkan ke tabel backup', 'success')
+            return redirect(url_for('main.employee_list'))
         else:
             cursor.close()
-            return jsonify({"status": "gagal", "pesan": "User tidak ditemukan"}), 404
+            flash('User tidak ditemukan', 'danger')
+            return redirect(url_for('main.employee_list'))
 
     except Exception as e:
         connection.rollback()
         cursor.close()
-        return jsonify({"status": "gagal", "pesan": str(e)}), 500
+        flash(f'Gagal menghapus user: {str(e)}', 'danger')
+        return redirect(url_for('main.employee_list'))
 
 def recognize_face(face_encoding):
     connection = get_db()
