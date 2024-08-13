@@ -202,29 +202,70 @@ def register_admin():
         name = request.form['name']
         email = request.form['email']
         password = request.form['password']
-        role = 'admin'  # Specify admin role
-        registration_date = datetime.now()
-        unique_code = generate_unique_code()
-
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-
+        
+        # Check if the user with this NIK or email already exists
         connection = get_db()
         cursor = connection.cursor()
-        
         cursor.execute("SELECT id FROM users WHERE nik=%s OR email=%s", (nik, email))
         existing_user = cursor.fetchone()
         if existing_user:
             cursor.close()
             return jsonify({"status": "gagal", "pesan": "NIK atau Email sudah terdaftar"}), 400
+        
+        # Store the user data temporarily in the session
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        session['new_admin'] = {
+            'nik': nik,
+            'name': name,
+            'email': email,
+            'password': hashed_password
+        }
+        
+        # Return success to trigger face registration modal
+        return jsonify({"status": "sukses"})
 
-        cursor.execute("INSERT INTO users (nik, name, email, password, registration_date, role, unique_code) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                       (nik, name, email, hashed_password, registration_date, role, unique_code))
+    return jsonify({"status": "gagal", "pesan": "Anda tidak diizinkan untuk menambahkan admin"}), 403
+
+@auth_bp.route('/register_admin_face', methods=['POST'])
+@login_required
+def register_admin_face():
+    if 'new_admin' not in session:
+        return jsonify({"status": "gagal", "pesan": "Tidak ada data admin baru yang ditemukan"}), 400
+
+    face_image = request.files['face_image']
+    npimg = np.frombuffer(face_image.read(), np.uint8)
+    img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+
+    try:
+        # Generate face embedding
+        result = DeepFace.represent(img, model_name='Facenet', enforce_detection=False)
+        face_encoding = result[0]["embedding"]
+
+        # Save the new admin and face encoding to the database
+        new_admin = session.pop('new_admin')
+        connection = get_db()
+        cursor = connection.cursor()
+
+        # Insert the new admin into the users table
+        cursor.execute("""
+            INSERT INTO users (nik, name, email, password, registration_date, role, unique_code)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (new_admin['nik'], new_admin['name'], new_admin['email'], new_admin['password'], datetime.now(), 'admin', generate_unique_code()))
         connection.commit()
+
         user_id = cursor.lastrowid
+
+        # Insert the face encoding into the faces table
+        cursor.execute("INSERT INTO faces (user_id, encoding) VALUES (%s, %s)", (user_id, encode_face(face_encoding)))
+        connection.commit()
         cursor.close()
 
         return jsonify({"status": "sukses", "user_id": user_id})
-    return jsonify({"status": "gagal", "pesan": "Anda tidak diizinkan untuk menambahkan admin"}), 403
+
+    except Exception as e:
+        logging.exception("Terjadi kesalahan saat memproses wajah")
+        return jsonify({"status": "gagal", "pesan": "Wajah tidak ditemukan atau terjadi kesalahan"}), 400
+
 
 @auth_bp.route('/login', methods=['POST', 'GET'])
 def login():

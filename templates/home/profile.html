@@ -254,6 +254,8 @@
                 if (data.status === 'sukses') {
                     $('#face-register-modal').modal('show');
                     window.localStorage.setItem('user_id', data.user_id);
+                    // Hanya aktifkan webcam ketika modal terbuka
+                    startWebcam();
                 } else {
                     alert('Pendaftaran admin baru gagal: ' + data.pesan);
                 }
@@ -261,9 +263,29 @@
             .catch(error => console.error('Error:', error));
         });
 
-        document.getElementById('capture-face').addEventListener('click', function () {
+        function startWebcam() {
             const video = document.getElementById('register-video');
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(function(stream) {
+                        video.srcObject = stream;
+                        video.play();
+                    })
+                    .catch(function(err) {
+                        console.error("Error accessing camera: " + err);
+                        alert("Tidak dapat mengakses kamera.");
+                    });
+            }
+        }
+
+        document.getElementById('capture-face').addEventListener('click', function () {
             const canvas = document.createElement('canvas');
+            const captureButton = document.getElementById('capture-face');
+            
+            // Set state to "Menunggu.."
+            captureButton.textContent = 'Menunggu..';
+            captureButton.disabled = true;
+
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -271,9 +293,8 @@
             canvas.toBlob(function (blob) {
                 const formData = new FormData();
                 formData.append('face_image', blob);
-                formData.append('user_id', window.localStorage.getItem('user_id'));
 
-                fetch('{{ url_for("auth.register_face") }}', {
+                fetch('{{ url_for("auth.register_admin_face") }}', {
                     method: 'POST',
                     body: formData
                 })
@@ -281,13 +302,18 @@
                 .then(data => {
                     if (data.status === 'sukses') {
                         alert('Admin baru berhasil didaftarkan');
-                        window.location.reload();
+                        window.location.reload(); // Refresh the page to stop the webcam
                     } else {
                         alert('Pendaftaran wajah gagal: ' + data.pesan);
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
+                })
+                .finally(() => {
+                    // Reset the button state
+                    captureButton.textContent = 'Ambil Gambar Wajah';
+                    captureButton.disabled = false;
                 });
             }, 'image/png');
         });
