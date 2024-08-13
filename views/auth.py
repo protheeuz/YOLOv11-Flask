@@ -294,7 +294,7 @@ def login():
                 session['health_status'] = get_health_check_status(user_data[0])
 
                 if user_data[2] == 'admin':
-                    return jsonify({"status": "sukses", "user_id": user_data[0]})
+                    return jsonify({"status": "sukses", "user_id": user_data[0], "redirect": url_for('main.index')})
                 
                 check_date = datetime.now().date()
                 cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_data[0], check_date))
@@ -399,6 +399,9 @@ def login_qr():
             session['user_id'] = user_id
             session['session_token'] = generate_session_token()
 
+            if user_role == 'admin':
+                return jsonify({"status": "sukses", "role": "admin", "redirect": url_for('main.index')})
+
             check_date = datetime.now().date()
             cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
             health_check = cursor.fetchone()
@@ -414,6 +417,7 @@ def login_qr():
     else:
         cursor.close()
         return jsonify({"status": "gagal", "pesan": "QR Code tidak valid"}), 401
+
 
 @auth_bp.route('/logout')
 @login_required

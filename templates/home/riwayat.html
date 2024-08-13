@@ -11,37 +11,78 @@
                     <div class="page-wrapper">
                         <div class="row">
                             <div class="col-sm-12">
-                                <div class="card">
+                                {% for date, data in riwayat_data.items() %}
+                                <div class="card mt-4">
                                     <div class="card-header">
-                                        <h5>Data Riwayat</h5>
+                                        <h5>Data Riwayat - {{ date }}</h5>
                                     </div>
-                                    <div class="card-block">
-                                        <div class="table-responsive">
-                                            <table class="table table-striped">
-                                                <thead>
-                                                    <tr>
-                                                        {% if current_user.role == 'admin' %}
-                                                        <th>Nama Karyawan</th>
-                                                        {% endif %}
-                                                        <th>Tanggal</th>
-                                                        <th>Data</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {% for row in riwayat_data %}
-                                                    <tr>
-                                                        {% if current_user.role == 'admin' %}
-                                                        <td>{{ row[0] }}</td>
-                                                        {% endif %}
-                                                        <td>{{ row[1] }}</td>
-                                                        <td>{{ row[2] }}</td>
-                                                    </tr>
-                                                    {% endfor %}
-                                                </tbody>
-                                            </table>
+                                    <div class="card-body">
+                                        <table class="table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Nama Karyawan</th>
+                                                    <th>Detak Jantung</th>
+                                                    <th>Kadar Oksigen</th>
+                                                    <th>Suhu</th>
+                                                    <th>Tingkat Aktivitas</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>{{ data['name'] }}</td>
+                                                    <td>{{ data['heart_rate'] }}</td>
+                                                    <td>{{ data['oxygen_level'] }}</td>
+                                                    <td>{{ data['temperature'] }}</td>
+                                                    <td>{{ data['activity_level'] }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+
+                                        {% if data['ecg_values'] %}
+                                        <div class="mt-4">
+                                            <canvas id="ecgChart-{{ loop.index }}"></canvas>
                                         </div>
+                                        {% endif %}
                                     </div>
                                 </div>
+
+                                <script>
+                                document.addEventListener('DOMContentLoaded', function () {
+                                    const ctx = document.getElementById('ecgChart-{{ loop.index }}').getContext('2d');
+                                    const ecgChart = new Chart(ctx, {
+                                        type: 'line',
+                                        data: {
+                                            labels: {{ data['ecg_timestamps']|tojson }},
+                                            datasets: [{
+                                                label: 'ECG Value',
+                                                data: {{ data['ecg_values']|tojson }},
+                                                borderColor: 'rgba(75, 192, 192, 1)',
+                                                borderWidth: 1,
+                                                fill: false,
+                                            }]
+                                        },
+                                        options: {
+                                            scales: {
+                                                x: {
+                                                    type: 'category',
+                                                    title: {
+                                                        display: true,
+                                                        text: 'Waktu'
+                                                    }
+                                                },
+                                                y: {
+                                                    title: {
+                                                        display: true,
+                                                        text: 'Nilai ECG'
+                                                    },
+                                                    beginAtZero: true
+                                                }
+                                            }
+                                        }
+                                    });
+                                });
+                                </script>
+                                {% endfor %}
                             </div>
                         </div>
                     </div>
@@ -51,3 +92,7 @@
     </div>
 </div>
 {% endblock content %}
+
+{% block javascripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}

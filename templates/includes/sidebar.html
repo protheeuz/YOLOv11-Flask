@@ -25,29 +25,34 @@
                         <span class="pcoded-mtext">Halaman Profil</span>
                     </a>
                 </li>
-                <li class="nav-item pcoded-menu-caption">
-                    <label>Tabel & Hasil</label>
-                </li>
 
                 {% if current_user.role == 'admin' %}
-                <li data-username="admin riwayat" class="nav-item {% if 'riwayat' in segment %} active {% endif %}">
-                    <a href="{{ url_for('main.riwayat') }}" class="nav-link"><span class="pcoded-micon"><i class="feather icon-file-text"></i></span><span class="pcoded-mtext">Riwayat Kesehatan Karyawan</span></a>
+                <li class="nav-item pcoded-menu-caption">
+                    <label>Riwayat Kesehatan</label>
                 </li>
-                <li data-username="employee list" class="nav-item {% if 'employee_list' in segment %} active {% endif %}">
+                <li data-username="riwayat kesehatan semua karyawan" class="nav-item {% if 'riwayat' in segment %} active {% endif %}">
+                    <a href="{{ url_for('main.riwayat') }}" class="nav-link">
+                        <span class="pcoded-micon"><i class="feather icon-activity"></i></span>
+                        <span class="pcoded-mtext">Riwayat Semua Karyawan</span>
+                    </a>
+                </li>
+                <li data-username="Daftar Karyawan" class="nav-item {% if 'employee_list' in segment %} active {% endif %}">
                     <a href="/employee_list" class="nav-link"><span class="pcoded-micon"><i class="feather icon-users"></i></span><span class="pcoded-mtext">Daftar Karyawan</span></a>
                 </li>
                 {% else %}
-                <li data-username="user riwayat" class="nav-item {% if 'riwayat' in segment %} active {% endif %}">
-                    <a href="{{ url_for('main.riwayat_karyawan', user_id=current_user.id) }}" class="nav-link"><span class="pcoded-micon"><i class="feather icon-file-text"></i></span><span class="pcoded-mtext">Riwayat Kesehatan Saya</span></a>
+                <li class="nav-item pcoded-menu-caption">
+                    <label>Riwayat Kesehatan Saya</label>
+                </li>
+                <li data-username="riwayat kesehatan" class="nav-item {% if 'riwayat_karyawan' in segment %} active {% endif %}">
+                    <a href="{{ url_for('main.riwayat_karyawan', user_id=current_user.id) }}" class="nav-link">
+                        <span class="pcoded-micon"><i class="feather icon-activity"></i></span>
+                        <span class="pcoded-mtext">Riwayat Kesehatan Saya</span>
+                    </a>
                 </li>
                 {% endif %}
 
-                <li data-username="Authentication Sign up Sign in reset password Change password Personal information profile settings map form subscribe"
-                    class="nav-item pcoded-hasmenu">
-                    <ul class="pcoded-submenu">
-                        <li><a href="/register.html" class="" target="_blank">Daftar</a></li>
-                        <li><a href="/login.html" class="" target="_blank">Masuk</a></li>
-                    </ul>
+                <li class="nav-item pcoded-menu-caption">
+                    <label>Lainnya</label>
                 </li>
                 <li data-username="Disabled Menu" class="nav-item">
                     <a href="{{ url_for('auth.logout') }}" class="nav-link">
