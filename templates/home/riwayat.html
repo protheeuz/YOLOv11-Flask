@@ -1,0 +1,53 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Data Riwayat {% endblock %}
+
+{% block content %}
+<div class="pcoded-main-container">
+    <div class="pcoded-wrapper">
+        <div class="pcoded-content">
+            <div class="pcoded-inner-content">
+                <div class="main-body">
+                    <div class="page-wrapper">
+                        <div class="row">
+                            <div class="col-sm-12">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h5>Data Riwayat</h5>
+                                    </div>
+                                    <div class="card-block">
+                                        <div class="table-responsive">
+                                            <table class="table table-striped">
+                                                <thead>
+                                                    <tr>
+                                                        {% if current_user.role == 'admin' %}
+                                                        <th>Nama Karyawan</th>
+                                                        {% endif %}
+                                                        <th>Tanggal</th>
+                                                        <th>Data</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for row in riwayat_data %}
+                                                    <tr>
+                                                        {% if current_user.role == 'admin' %}
+                                                        <td>{{ row[0] }}</td>
+                                                        {% endif %}
+                                                        <td>{{ row[1] }}</td>
+                                                        <td>{{ row[2] }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

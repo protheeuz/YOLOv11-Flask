@@ -1,0 +1,92 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="pcoded-main-container">
+    <div class="pcoded-wrapper">
+        <div class="pcoded-content">
+            <div class="pcoded-inner-content">
+                <div class="main-body">
+                    <div class="page-wrapper">
+                        <!-- Tampilkan Riwayat Kesehatan -->
+                        <h3>Riwayat Kesehatan Saya</h3>
+                        
+                        <!-- Tabel untuk Sensor Lainnya -->
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Detak Jantung</th>
+                                    <th>Kadar Oksigen</th>
+                                    <th>Suhu</th>
+                                    <th>Tingkat Aktivitas</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in riwayat_data %}
+                                <tr>
+                                    <td>{{ record.timestamp }}</td>
+                                    <td>{{ record.heart_rate }}</td>
+                                    <td>{{ record.oxygen_level }}</td>
+                                    <td>{{ record.temperature }}</td>
+                                    <td>{{ record.activity_level }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+
+                        <!-- Grafik ECG -->
+                        <div class="card mt-4">
+                            <div class="card-header">
+                                <h5>Grafik ECG</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="ecgChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const ctx = document.getElementById('ecgChart').getContext('2d');
+        const ecgChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: {{ ecg_timestamps|tojson }},
+                datasets: [{
+                    label: 'ECG Value',
+                    data: {{ ecg_values|tojson }},
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1,
+                    fill: false,
+                }]
+            },
+            options: {
+                scales: {
+                    x: {
+                        type: 'category',
+                        title: {
+                            display: true,
+                            text: 'Waktu'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Nilai ECG'
+                        },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

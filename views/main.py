@@ -198,21 +198,30 @@ def index_karyawan():
     cursor = connection.cursor()
 
     cursor.execute("""
-        SELECT completed FROM health_checks
-        WHERE user_id = %s AND check_date = CURDATE()
-    """, (current_user.id,))
-    health_check = cursor.fetchone()
-    
-    cursor.execute("""
         SELECT 
             MAX(CASE WHEN heart_rate IS NOT NULL THEN heart_rate ELSE NULL END) AS heart_rate,
             MAX(CASE WHEN oxygen_level IS NOT NULL THEN oxygen_level ELSE NULL END) AS oxygen_level,
             MAX(CASE WHEN temperature IS NOT NULL THEN temperature ELSE NULL END) AS temperature,
             MAX(CASE WHEN activity_level IS NOT NULL THEN activity_level ELSE NULL END) AS activity_level
         FROM sensor_data
-        WHERE user_id = %s AND DATE(timestamp) = (SELECT MAX(DATE(timestamp)) FROM sensor_data WHERE user_id = %s)
-    """, (current_user.id, current_user.id))
+        WHERE user_id = %s AND DATE(timestamp) = CURDATE()
+    """, (current_user.id,))
     latest_health_data = cursor.fetchone()
+
+    if latest_health_data is None or all(val is None for val in latest_health_data):
+        latest_health_data = {
+            'heart_rate': '-',
+            'oxygen_level': '-',
+            'temperature': '-',
+            'activity_level': '-'
+        }
+    else:
+        latest_health_data = {
+            'heart_rate': latest_health_data[0] if latest_health_data[0] is not None else '-',
+            'oxygen_level': latest_health_data[1] if latest_health_data[1] is not None else '-',
+            'temperature': latest_health_data[2] if latest_health_data[2] is not None else '-',
+            'activity_level': latest_health_data[3] if latest_health_data[3] is not None else '-'
+        }
 
     cursor.execute("""
         SELECT ecg_value, timestamp 
@@ -224,31 +233,16 @@ def index_karyawan():
 
     cursor.close()
 
-    if latest_health_data is None:
-        latest_health_data = {
-            'heart_rate': '-',
-            'oxygen_level': '-',
-            'temperature': '-',
-            'activity_level': '-'
-        }
-    else:
-        latest_health_data = {
-            'heart_rate': latest_health_data[0] or '-',
-            'oxygen_level': latest_health_data[1] or '-',
-            'temperature': latest_health_data[2] or '-',
-            'activity_level': latest_health_data[3] or '-'
-        }
-
-    ecg_values = [data[0] for data in ecg_data]
+    ecg_values = [json.loads(data[0]) for data in ecg_data]
     ecg_timestamps = [data[1].strftime('%H:%M:%S') for data in ecg_data]
 
     health_status = get_health_check_status(current_user.id)
 
     return render_template('home/index_karyawan.html',
-                        latest_health_data=latest_health_data,
-                        ecg_values=ecg_values,
-                        ecg_timestamps=ecg_timestamps,
-                        health_status=health_status)
+                           latest_health_data=latest_health_data,
+                           ecg_values=ecg_values,
+                           ecg_timestamps=ecg_timestamps,
+                           health_status=health_status)
 
 @main_bp.route('/skip_health_check', methods=['POST'])
 @login_required
@@ -596,3 +590,68 @@ def send_session_token():
             return jsonify({'status': 'gagal', 'message': 'Failed to send Session Token to ESP32'})
     except Exception as e:
         return jsonify({'status': 'gagal', 'message': str(e)}), 500
+    
+@main_bp.route('/riwayat')
+@login_required
+def riwayat():
+    connection = get_db()
+    cursor = connection.cursor()
+
+    if current_user.role == 'admin':
+        # Admin dapat melihat riwayat semua karyawan
+        cursor.execute("""
+            SELECT u.name, r.date, r.data 
+            FROM riwayat r
+            JOIN users u ON r.user_id = u.id
+            ORDER BY r.date DESC
+        """)
+    else:
+        # Karyawan hanya dapat melihat riwayat mereka sendiri
+        cursor.execute("""
+            SELECT r.date, r.data 
+            FROM riwayat r
+            WHERE r.user_id = %s
+            ORDER BY r.date DESC
+        """, (current_user.id,))
+
+    riwayat_data = cursor.fetchall()
+    cursor.close()
+
+    return render_template('home/riwayat.html', riwayat_data=riwayat_data)
+
+@main_bp.route('/riwayat_karyawan/<int:user_id>')
+@login_required
+def riwayat_karyawan(user_id):
+    if current_user.id != user_id and current_user.role != 'admin':
+        return redirect(url_for('main.index'))
+
+    connection = get_db()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        SELECT timestamp, heart_rate, oxygen_level, temperature, activity_level
+        FROM sensor_data
+        WHERE user_id = %s
+        ORDER BY timestamp DESC
+    """, (user_id,))
+    riwayat_data = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT ecg_value, timestamp
+        FROM sensor_data
+        WHERE user_id = %s AND ecg_value IS NOT NULL
+        ORDER BY timestamp ASC
+    """, (user_id,))
+    ecg_data = cursor.fetchall()
+    cursor.close()
+
+    ecg_values = []
+    ecg_timestamps = []
+
+    for ecg_record in ecg_data:
+        values = json.loads(ecg_record[0])  # Load JSON data
+        timestamp = ecg_record[1].strftime('%H:%M:%S')
+        ecg_values.extend(values)
+        ecg_timestamps.extend([timestamp] * len(values))
+
+    return render_template('home/riwayat_karyawan.html', riwayat_data=riwayat_data, ecg_values=ecg_values, ecg_timestamps=ecg_timestamps)
