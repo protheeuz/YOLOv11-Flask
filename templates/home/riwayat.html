@@ -11,8 +11,22 @@
                     <div class="page-wrapper">
                         <div class="row">
                             <div class="col-sm-12">
+                                <!-- Kolom pencarian nama -->
+                                <div class="mb-3">
+                                    <input type="text" id="searchInput" class="form-control" placeholder="Cari Nama Karyawan...">
+                                </div>
+                                <!-- Date picker untuk rentang tanggal -->
+                                <div class="mb-3 row">
+                                    <div class="col">
+                                        <input type="date" id="startDate" class="form-control" placeholder="Mulai Tanggal">
+                                    </div>
+                                    <div class="col">
+                                        <input type="date" id="endDate" class="form-control" placeholder="Sampai Tanggal">
+                                    </div>
+                                </div>
+
                                 {% for date, data in riwayat_data.items() %}
-                                <div class="card mt-4">
+                                <div class="card mt-4 riwayat-card" data-date="{{ date }}">
                                     <div class="card-header">
                                         <h5>Data Riwayat - {{ date }}</h5>
                                     </div>
@@ -95,4 +109,38 @@
 
 {% block javascripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-{% endblock %}
+<script>
+    function filterResults() {
+        var searchValue = document.getElementById('searchInput').value.toLowerCase();
+        var startDate = document.getElementById('startDate').value;
+        var endDate = document.getElementById('endDate').value;
+        var cards = document.querySelectorAll('.riwayat-card');
+
+        cards.forEach(function(card) {
+            var nameCell = card.querySelector('td:nth-child(1)').innerText.toLowerCase();
+            var cardDate = card.getAttribute('data-date');
+
+            var nameMatch = nameCell.includes(searchValue);
+            var dateMatch = true;
+
+            if (startDate && endDate) {
+                dateMatch = (cardDate >= startDate && cardDate <= endDate);
+            } else if (startDate) {
+                dateMatch = (cardDate >= startDate);
+            } else if (endDate) {
+                dateMatch = (cardDate <= endDate);
+            }
+
+            if (nameMatch && dateMatch) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    document.getElementById('searchInput').addEventListener('input', filterResults);
+    document.getElementById('startDate').addEventListener('input', filterResults);
+    document.getElementById('endDate').addEventListener('input', filterResults);
+</script>
+{% endblock javascripts %}

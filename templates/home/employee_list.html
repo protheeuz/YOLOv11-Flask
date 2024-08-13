@@ -27,6 +27,7 @@
                                                         <th>Terakhir Login</th>
                                                         <th>Alamat</th>
                                                         <th>Status</th>
+                                                        <th>Aksi</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -39,6 +40,9 @@
                                                         <td>{{ employee[3] if employee[3] else 'Belum tersedia' }}</td>
                                                         <td>{{ employee[4] if employee[4] else 'Belum tersedia' }}</td>
                                                         <td>{{ employee[5] if employee[5] else 'Belum tersedia' }}</td>
+                                                        <td>
+                                                            <button class="btn btn-danger btn-sm" onclick="deleteUser({{ employee[6] }})">Hapus</button>
+                                                        </td>
                                                     </tr>
                                                     {% endfor %}
                                                 </tbody>
@@ -54,4 +58,29 @@
         </div>
     </div>
 </div>
+
+<script>
+    function deleteUser(userId) {
+        if (confirm('Apakah Anda yakin ingin menghapus karyawan ini?')) {
+            fetch(`/auth/delete_user/${userId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'  // Pastikan menggunakan CSRF token jika diperlukan
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "sukses") {
+                    alert(data.pesan);
+                    location.reload();  // Refresh halaman
+                } else {
+                    alert(`Error: ${data.pesan}`);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    }
+</script>
+
 {% endblock %}

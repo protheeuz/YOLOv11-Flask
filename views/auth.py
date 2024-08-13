@@ -462,16 +462,35 @@ def delete_user(user_id):
     cursor = connection.cursor()
 
     try:
-        cursor.execute("DELETE FROM faces WHERE user_id=%s", (user_id,))
-        cursor.execute("DELETE FROM users WHERE id=%s", (user_id,))
-        connection.commit()
-        cursor.close()
-        
-        return jsonify({"status": "sukses", "pesan": "User berhasil dihapus"})
+        # Dapatkan data pengguna yang akan dihapus dari tabel `users`
+        cursor.execute("SELECT * FROM users WHERE id=%s", (user_id,))
+        user_data = cursor.fetchone()
+
+        if user_data:
+            # Hapus data terkait dari tabel faces terlebih dahulu
+            cursor.execute("DELETE FROM faces WHERE user_id=%s", (user_id,))
+
+            # Pindahkan data pengguna ke tabel `users_backup`
+            cursor.execute("""
+                INSERT INTO users_backup (id, nik, name, email, password, registration_date, last_login, address, about, profile_image, role, unique_code)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, user_data)
+
+            # Hapus data pengguna dari tabel `users`
+            cursor.execute("DELETE FROM users WHERE id=%s", (user_id,))
+
+            connection.commit()
+            cursor.close()
+
+            return jsonify({"status": "sukses", "pesan": "User berhasil dihapus dan dipindahkan ke tabel backup"})
+        else:
+            cursor.close()
+            return jsonify({"status": "gagal", "pesan": "User tidak ditemukan"}), 404
+
     except Exception as e:
         connection.rollback()
         cursor.close()
-        return jsonify({"status": "gagal", "pesan": str(e)}), 500 
+        return jsonify({"status": "gagal", "pesan": str(e)}), 500
 
 def recognize_face(face_encoding):
     connection = get_db()

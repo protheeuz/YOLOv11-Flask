@@ -563,7 +563,7 @@ def employee_list():
     cursor = connection.cursor()
 
     cursor.execute("""
-        SELECT nik, name, registration_date, last_login, address, about
+        SELECT nik, name, registration_date, last_login, address, about, id  # Tambahkan id di sini
         FROM users
         WHERE role = 'karyawan'
         ORDER BY registration_date DESC

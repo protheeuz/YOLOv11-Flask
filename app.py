@@ -1,19 +1,8 @@
-# app.py
 import os
 import warnings
-from wsgiref import headers
 from dotenv import load_dotenv
 from flask_cors import CORS
-
-# Menonaktifkan operasi khusus oneDNN untuk TensorFlow
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Mengurangi log peringatan TensorFlow
-
-# Mengabaikan peringatan DeprecationWarning
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-
-import requests
-import tensorflow as tf
+from flask_wtf.csrf import CSRFProtect
 from flask import Flask, current_app, render_template, redirect, request, session, url_for
 from flask_login import LoginManager, current_user, login_required
 from config import Config
@@ -22,6 +11,13 @@ from views.auth import auth_bp
 from views.main import main_bp
 from models import User
 
+# Menonaktifkan operasi khusus oneDNN untuk TensorFlow
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Mengurangi log peringatan TensorFlow
+
+# Mengabaikan peringatan DeprecationWarning
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 # Load variabel lingkungan dari file .env
 load_dotenv()
 
@@ -29,6 +25,9 @@ app = Flask(__name__)
 app.config.from_object(Config)
 app.secret_key = '5f957e6105f189f9974ae631b351b321'
 CORS(app)
+
+# Inisialisasi CSRF protection
+csrf = CSRFProtect(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -46,7 +45,7 @@ def inject_user():
     new_logins_count = 0
     if current_user.is_authenticated and current_user.role == 'admin':
         new_logins_count = get_new_logins_count()
-    return dict(current_user=current_user, new_logins_count=new_logins_count)
+    return dict(current_user=current_user, new_logins_count=new_logins_count, csrf_token=csrf.generate_csrf)
 
 def get_new_logins_count():
     connection = get_db()
