@@ -56,14 +56,6 @@
                                             <div class="row">
                                                 <div class="col-sm-6 mb-4">
                                                     <div class="form-group">
-                                                        <label for="exampleInputNIK">NIK</label>
-                                                        <input class="form-control" id="exampleInputNIK" name="nik" readonly 
-                                                               value="{{ current_user.nik }}"
-                                                               aria-describedby="nikHelp" placeholder="Masukkan NIK">
-                                                    </div>
-                                                </div>
-                                                <div class="col-sm-6 mb-4">
-                                                    <div class="form-group">
                                                         <label {% if not current_user.email %} class="text-danger" {% endif %} 
                                                                for="exampleInputEmail1">Alamat Email</label>
                                                         <input type="email" name="email"
@@ -76,13 +68,17 @@
                                                         {% endif %}    
                                                     </div>
                                                 </div>
-                                                <div class="col-sm-12 mb-4">
+                                                
+                                                <!-- Nama Lengkap di sebelah alamat email -->
+                                                <div class="col-sm-6 mb-4">
                                                     <div class="form-group">
                                                         <label for="name">Nama Lengkap</label>
                                                         <input type="text" name="name" class="form-control" id="name" 
                                                                value="{{ current_user.name }}" placeholder="Nama lengkap Anda">
                                                     </div>
                                                 </div>
+                                                
+                                                <!-- Alamat tetap di bawah Nama Lengkap -->
                                                 <div class="col-sm-12 mb-4">
                                                     <div class="form-group">
                                                         <label for="address">Alamat</label>
@@ -91,6 +87,16 @@
                                                         <small id="addressHelp" class="form-text text-muted">Ini adalah alamat Kamu</small>
                                                     </div>
                                                 </div>
+
+                                                <div class="col-sm-12 mb-4">
+                                                    <div class="form-group">
+                                                        <label for="phone">WhatsApp</label>
+                                                        <input type="text" name="phone" class="form-control" id="phone" 
+                                                               value="{{ current_user.phone }}" placeholder="No. WhatsApp">
+                                                        <small id="phoneHelp" class="form-text text-muted">WhatsApp digunakan untuk mengirimkan laporan pendeteksian jatuh.</small>
+                                                    </div>
+                                                </div>
+                                                
                                                 <div class="col-sm-12 mb-4">
                                                     <div class="form-group">
                                                         <label for="about">Tentang Info</label>
@@ -104,7 +110,7 @@
                                                     <div class="form-group">
                                                         <button type="submit" class="btn btn-primary">Perbarui</button>
                                                     </div>
-                                                </div>                                                
+                                                </div>                                                 
                                             </div>
                                         </form>
                                     </div>
@@ -139,90 +145,11 @@
                                             </p>
                                         </div>
                                         <div class="d-flex justify-content-center align-items-center">
-                                            <a href="https://sintafeed.com/ver3/?page_id=126" 
+                                            <a href="https://unsada.ac.id/" 
                                                target="_blank" 
                                                class="h6 text-muted d-block m-1"><i
                                                class="icon feather icon-help-circle"></i></a>
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- [ Main Content ] end -->
-
-                        {% if current_user.role == 'admin' %}
-                        <div class="row mt-4">
-                            <div class="col-sm-12">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h5>Tambah Admin Baru</h5>
-                                    </div>
-                                    <div class="card-block">
-                                        <form action="{{ url_for('auth.register_admin') }}" method="post" id="newAdminForm">
-                                            <div class="row">
-                                                <div class="col-sm-6 mb-4">
-                                                    <div class="form-group">
-                                                        <label for="newAdminNIK">NIK</label>
-                                                        <input class="form-control" id="newAdminNIK" name="nik" 
-                                                               aria-describedby="nikHelp" placeholder="Masukkan NIK" required>
-                                                    </div>
-                                                </div>
-                                                <div class="col-sm-6 mb-4">
-                                                    <div class="form-group">
-                                                        <label for="newAdminEmail">Alamat Email</label>
-                                                        <input type="email" name="email" class="form-control" id="newAdminEmail" 
-                                                               aria-describedby="emailHelp" placeholder="Masukkan email" required>
-                                                    </div>
-                                                </div>
-                                                <div class="col-sm-6 mb-4">
-                                                    <div class="form-group">
-                                                        <label for="newAdminName">Nama Lengkap</label>
-                                                        <input type="text" name="name" class="form-control" id="newAdminName" 
-                                                               placeholder="Masukkan nama lengkap" required>
-                                                    </div>
-                                                </div>
-                                                <div class="col-sm-6 mb-4">
-                                                    <div class="form-group">
-                                                        <label for="newAdminPassword">Kata Sandi</label>
-                                                        <input type="password" name="password" class="form-control" id="newAdminPassword" 
-                                                               placeholder="Masukkan kata sandi" required>
-                                                    </div>
-                                                </div>
-                                                <div class="col-sm-12 mb-4">
-                                                    <div class="form-group">
-                                                        <button type="submit" class="btn btn-primary">Daftarkan Admin</button>
-                                                    </div>
-                                                </div>                                                
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        {% endif %}
-
-                        <div id="face-register-modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="faceRegisterModalLabel" aria-hidden="true">
-                            <div class="modal-dialog modal-lg" role="document">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title" id="faceRegisterModalLabel">Registrasi Wajah</h5>
-                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                            <span aria-hidden="true">&times;</span>
-                                        </button>
-                                    </div>
-                                    <div class="modal-body text-center">
-                                        <form id="faceRegisterForm" enctype="multipart/form-data">
-                                            <div style="position: relative; display: inline-block;">
-                                                <video id="register-video" width="640" height="480" autoplay></video>
-                                                <div class="face-box"></div>
-                                                <div class="scan-line"></div>
-                                                <div id="loading-register" style="display:none;">Sedang memproses wajah...</div>
-                                            </div>
-                                            <button type="button" id="capture-face" class="btn btn-primary mt-3">Ambil Gambar Wajah</button>
-                                        </form>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                                     </div>
                                 </div>
                             </div>
@@ -236,87 +163,3 @@
 <!-- [ Main Content ] end -->
 
 {% endblock content %}
-
-<!-- Specific Page JS goes HERE  -->
-{% block javascripts %}
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        document.getElementById('newAdminForm').addEventListener('submit', function (event) {
-            event.preventDefault();
-            const formData = new FormData(this);
-
-            fetch('{{ url_for("auth.register_admin") }}', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'sukses') {
-                    $('#face-register-modal').modal('show');
-                    window.localStorage.setItem('user_id', data.user_id);
-                    // Hanya aktifkan webcam ketika modal terbuka
-                    startWebcam();
-                } else {
-                    alert('Pendaftaran admin baru gagal: ' + data.pesan);
-                }
-            })
-            .catch(error => console.error('Error:', error));
-        });
-
-        function startWebcam() {
-            const video = document.getElementById('register-video');
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                navigator.mediaDevices.getUserMedia({ video: true })
-                    .then(function(stream) {
-                        video.srcObject = stream;
-                        video.play();
-                    })
-                    .catch(function(err) {
-                        console.error("Error accessing camera: " + err);
-                        alert("Tidak dapat mengakses kamera.");
-                    });
-            }
-        }
-
-        document.getElementById('capture-face').addEventListener('click', function () {
-            const canvas = document.createElement('canvas');
-            const captureButton = document.getElementById('capture-face');
-            
-            // Set state to "Menunggu.."
-            captureButton.textContent = 'Menunggu..';
-            captureButton.disabled = true;
-
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            canvas.toBlob(function (blob) {
-                const formData = new FormData();
-                formData.append('face_image', blob);
-
-                fetch('{{ url_for("auth.register_admin_face") }}', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'sukses') {
-                        alert('Admin baru berhasil didaftarkan');
-                        window.location.reload(); // Refresh the page to stop the webcam
-                    } else {
-                        alert('Pendaftaran wajah gagal: ' + data.pesan);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                })
-                .finally(() => {
-                    // Reset the button state
-                    captureButton.textContent = 'Ambil Gambar Wajah';
-                    captureButton.disabled = false;
-                });
-            }, 'image/png');
-        });
-    });
-</script>
-{% endblock javascripts %}

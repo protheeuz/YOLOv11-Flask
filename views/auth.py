@@ -20,8 +20,6 @@ import random
 import string
 import logging
 
-from views.main import get_health_check_status
-
 auth_bp = Blueprint('auth', __name__)
 
 def generate_unique_code():
@@ -77,12 +75,12 @@ def send_reset_password_email(email, reset_link, name):
 @auth_bp.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
-        nik = request.form['nik']
+        email = request.form['email']
         
         connection = get_db()
         cursor = connection.cursor()
         
-        cursor.execute("SELECT id, email, name FROM users WHERE nik=%s", (nik,))
+        cursor.execute("SELECT id, email, name FROM users WHERE email=%s", (email,))
         user = cursor.fetchone()
         cursor.close()
         
@@ -93,9 +91,10 @@ def forgot_password():
             send_reset_password_email(email, reset_link, name)
             return render_template('auth/forgot_password.html', success='Link reset password telah dikirim ke email Anda.')
         else:
-            return render_template('auth/forgot_password.html', error='NIK yang dimasukkan memang belum tersedia.')
+            return render_template('auth/forgot_password.html', error='Email yang dimasukkan tidak terdaftar.')
     
     return render_template('auth/forgot_password.html')
+
 
 @auth_bp.route('/reset_password/<token>', methods=['GET', 'POST'])
 def reset_password(token):
@@ -119,29 +118,27 @@ def reset_password(token):
 
 @auth_bp.route('/check_existing_user', methods=['POST'])
 def check_existing_user():
-    nik = request.form['nik']
     email = request.form['email']
     
     connection = get_db()
     cursor = connection.cursor()
     
-    cursor.execute("SELECT id FROM users WHERE nik=%s OR email=%s", (nik, email))
+    cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
     existing_user = cursor.fetchone()
     cursor.close()
 
     if existing_user:
-        return jsonify({"status": "gagal", "pesan": "NIK atau Email sudah terdaftar"}), 400
+        return jsonify({"status": "gagal", "pesan": "Email sudah terdaftar"}), 400
     
     return jsonify({"status": "sukses"})
+
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        nik = request.form['nik']
         name = request.form['name']
         email = request.form['email']
         password = request.form['password']
-        role = 'karyawan'  
         registration_date = datetime.now()
         unique_code = generate_unique_code()
 
@@ -150,22 +147,34 @@ def register():
         connection = get_db()
         cursor = connection.cursor()
         
-        cursor.execute("SELECT id FROM users WHERE nik=%s OR email=%s", (nik, email))
-        existing_user = cursor.fetchone()
-        if existing_user:
+        try:
+            # Cek apakah email sudah terdaftar
+            cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
+            existing_user = cursor.fetchone()
+            if existing_user:
+                cursor.close()
+                return jsonify({"status": "gagal", "pesan": "Email sudah terdaftar"}), 400
+
+            # Simpan data pengguna baru ke tabel users tanpa face registration
+            cursor.execute("INSERT INTO users (name, email, password, registration_date, unique_code, face_registered) VALUES (%s, %s, %s, %s, %s, %s)",
+                           (name, email, hashed_password, registration_date, unique_code, False))
+            connection.commit()
+            user_id = cursor.lastrowid
+
             cursor.close()
-            return jsonify({"status": "gagal", "pesan": "NIK atau Email sudah terdaftar"}), 400
 
-        # Simpan data pengguna baru ke tabel users terlebih dahulu
-        cursor.execute("INSERT INTO users (nik, name, email, password, registration_date, role, unique_code) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                       (nik, name, email, hashed_password, registration_date, role, unique_code))
-        connection.commit()
-        user_id = cursor.lastrowid
-        cursor.close()
+            # Kirimkan user_id kembali ke klien untuk digunakan saat mendaftarkan wajah
+            return jsonify({"status": "sukses", "user_id": user_id})
 
-        # Kirimkan user_id kembali ke klien untuk digunakan saat mendaftarkan wajah
-        return jsonify({"status": "sukses", "user_id": user_id})
-    return render_template('auth/register.html')
+        except Exception as e:
+            # Menangkap error jika terjadi masalah dengan database
+            logging.error(f"Error during registration: {str(e)}")
+            cursor.close()
+            return jsonify({"status": "gagal", "pesan": "Terjadi kesalahan saat mendaftar, coba lagi nanti."}), 500
+    else:
+        return render_template('auth/register.html') 
+
+
 
 @auth_bp.route('/register_face', methods=['POST'])
 def register_face():
@@ -187,6 +196,9 @@ def register_face():
         cursor = connection.cursor()
         cursor.execute("INSERT INTO faces (user_id, encoding) VALUES (%s, %s)", (user_id, encode_face(face_encoding)))
         connection.commit()
+
+        cursor.execute("UPDATE users SET face_registered=%s WHERE id=%s", (True, user_id))
+        connection.commit()
         cursor.close()
 
         return jsonify({"status": "sukses"})
@@ -194,122 +206,64 @@ def register_face():
         logging.exception("Terjadi kesalahan saat memproses wajah")
         return jsonify({"status": "gagal", "pesan": "Wajah tidak ditemukan"}), 400
 
-@auth_bp.route('/register_admin', methods=['POST'])
-@login_required
-def register_admin():
-    if request.method == 'POST' and current_user.role == 'admin':
-        nik = request.form['nik']
-        name = request.form['name']
-        email = request.form['email']
-        password = request.form['password']
-        
-        # Check if the user with this NIK or email already exists
-        connection = get_db()
-        cursor = connection.cursor()
-        cursor.execute("SELECT id FROM users WHERE nik=%s OR email=%s", (nik, email))
-        existing_user = cursor.fetchone()
-        if existing_user:
-            cursor.close()
-            return jsonify({"status": "gagal", "pesan": "NIK atau Email sudah terdaftar"}), 400
-        
-        # Store the user data temporarily in the session
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-        session['new_admin'] = {
-            'nik': nik,
-            'name': name,
-            'email': email,
-            'password': hashed_password
-        }
-        
-        # Return success to trigger face registration modal
-        return jsonify({"status": "sukses"})
-
-    return jsonify({"status": "gagal", "pesan": "Anda tidak diizinkan untuk menambahkan admin"}), 403
-
-@auth_bp.route('/register_admin_face', methods=['POST'])
-@login_required
-def register_admin_face():
-    if 'new_admin' not in session:
-        return jsonify({"status": "gagal", "pesan": "Tidak ada data admin baru yang ditemukan"}), 400
-
-    face_image = request.files['face_image']
-    npimg = np.frombuffer(face_image.read(), np.uint8)
-    img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
-
-    try:
-        # Generate face embedding
-        result = DeepFace.represent(img, model_name='Facenet', enforce_detection=False)
-        face_encoding = result[0]["embedding"]
-
-        # Save the new admin and face encoding to the database
-        new_admin = session.pop('new_admin')
-        connection = get_db()
-        cursor = connection.cursor()
-
-        # Insert the new admin into the users table
-        cursor.execute("""
-            INSERT INTO users (nik, name, email, password, registration_date, role, unique_code)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (new_admin['nik'], new_admin['name'], new_admin['email'], new_admin['password'], datetime.now(), 'admin', generate_unique_code()))
-        connection.commit()
-
-        user_id = cursor.lastrowid
-
-        # Insert the face encoding into the faces table
-        cursor.execute("INSERT INTO faces (user_id, encoding) VALUES (%s, %s)", (user_id, encode_face(face_encoding)))
-        connection.commit()
-        cursor.close()
-
-        return jsonify({"status": "sukses", "user_id": user_id})
-
-    except Exception as e:
-        logging.exception("Terjadi kesalahan saat memproses wajah")
-        return jsonify({"status": "gagal", "pesan": "Wajah tidak ditemukan atau terjadi kesalahan"}), 400
 
 
 @auth_bp.route('/login', methods=['POST', 'GET'])
 def login():
     if request.method == 'POST':
-        nik = request.form['nik']
+        email = request.form['email']
         password = request.form['password']
-        esp32_ip = request.form.get('esp32_ip', '192.168.20.184')
+        logging.debug(f"Email yang dimasukkan: {email}")
+        logging.debug(f"Password yang dimasukkan: {password}")
 
         connection = get_db()
         cursor = connection.cursor()
-        cursor.execute("SELECT id, password, role FROM users WHERE nik=%s", (nik,))
+        cursor.execute("SELECT id, password FROM users WHERE email=%s", (email,))
         user_data = cursor.fetchone()
+
+        logging.debug(f"Mencari user dengan email: {email}")
 
         if user_data:
             stored_password = user_data[1]
+            logging.debug(f"Password yang disimpan: {stored_password}")
             password_correct = bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8'))
 
             if password_correct:
-                user = User.get(user_data[0])
+                user = User.get(user_data[0])  # Pastikan objek user valid
+                if not user:
+                    logging.error(f"User dengan ID {user_data[0]} tidak ditemukan setelah login.")
+                    return jsonify({"status": "gagal", "message": "User tidak ditemukan"}), 404
+
+                # Proses login berhasil
                 login_user(user)
                 session['user_id'] = user_data[0]
                 session['session_token'] = generate_session_token()
+
                 cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_data[0],))
                 connection.commit()
 
-                session['health_status'] = get_health_check_status(user_data[0])
+                logging.debug(f"User data ditemukan: {user_data}")
+                logging.debug(f"Password yang dimasukkan: {password}")
+                logging.debug(f"Password yang disimpan: {stored_password}")
 
-                if user_data[2] == 'admin':
-                    return jsonify({"status": "sukses", "user_id": user_data[0], "redirect": url_for('main.index')})
-                
-                check_date = datetime.now().date()
-                cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_data[0], check_date))
-                health_check = cursor.fetchone()
+                # Mengirimkan respons sukses yang lengkap
+                return jsonify({
+                    "status": "sukses",
+                    "user_id": user_data[0],
+                    "redirect": url_for('main.index')
+                })
 
-                if not health_check or not health_check[0]:
-                    return jsonify({"status": "health_check_required", "user_id": user_data[0]})
-                else:
-                    return jsonify({"status": "sukses", "user_id": user_data[0]})
-                    
+            else:
+                logging.error("Password yang dimasukkan salah.")
+                return jsonify({"status": "gagal", "message": "Email atau password salah"}), 401
+
+        else:
+            logging.error(f"User dengan email {email} tidak ditemukan.")
+            return jsonify({"status": "gagal", "message": "Email atau password salah"}), 401
+
         cursor.close()
-        return jsonify({"status": "gagal", "message": "NIK atau password salah"})
 
-    health_status = session.get('health_status', {})
-    return render_template('auth/login.html', health_status=health_status)
+    return render_template('auth/login.html')
 
 @auth_bp.route('/login_face', methods=['POST'])
 def login_face():
@@ -328,12 +282,10 @@ def login_face():
         return jsonify({"status": "gagal", "pesan": "Tidak dapat mengambil frame dari kamera"}), 400
 
     try:
-        logging.debug("Mengambil representasi wajah")
         result = DeepFace.represent(frame, model_name='Facenet', enforce_detection=False)
         if not result or "embedding" not in result[0]:
             logging.error("DeepFace gagal mendeteksi wajah atau menghasilkan representasi wajah.")
             return jsonify({"status": "gagal", "pesan": "Tidak ada wajah yang terdeteksi atau wajah tidak dikenali"}), 400
-        
         face_encoding = result[0]["embedding"]
         logging.debug(f"Representasi wajah berhasil diambil: {face_encoding}")
 
@@ -342,8 +294,6 @@ def login_face():
             logging.debug(f"Wajah dikenali, user_id: {user_id}")
             connection = get_db()
             cursor = connection.cursor()
-            cursor.execute("SELECT role FROM users WHERE id=%s", (user_id,))
-            user_role = cursor.fetchone()[0]
             cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_id,))
             connection.commit()
 
@@ -352,22 +302,14 @@ def login_face():
             
             session['user_id'] = user_id
             session['session_token'] = generate_session_token()
-            current_app.logger.debug(f'Session after login (face): {session.items()}')
-
             cursor.close()
 
-            if user_role == 'admin':
-                return jsonify({"status": "sukses", "role": "admin", "redirect": url_for('main.index')})
-            else:
-                check_date = datetime.now().date()
-                cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
-                health_check = cursor.fetchone()
-                cursor.close()
+            return jsonify({
+                "status": "sukses",
+                "user_id": user_id,
+                "redirect": url_for('main.index') 
+            })
 
-                if not health_check or not health_check[0]:
-                    return jsonify({"status": "health_check_required", "role": "karyawan", "user_id": user_id})
-                else:
-                    return jsonify({"status": "sukses", "role": "karyawan", "redirect": url_for('main.index_karyawan')})
         else:
             logging.error("Wajah tidak dikenali")
             return jsonify({"status": "gagal", "pesan": "Wajah tidak dikenali"}), 401
@@ -378,18 +320,21 @@ def login_face():
 @auth_bp.route('/login_qr', methods=['POST'])
 def login_qr():
     data = request.get_json()
-    qr_code = data.get('qr_code')
-    user_code = data.get('user_code')
+    qr_code = data.get('qr_code')  
+    user_code = data.get('user_code') 
     
+    if not qr_code or not user_code:
+        return jsonify({"status": "gagal", "pesan": "QR Code atau Kode Unik tidak ditemukan"}), 400
+
     connection = get_db()
     cursor = connection.cursor()
-    cursor.execute("SELECT id, unique_code, role FROM users WHERE nik=%s", (qr_code,))
+    
+    cursor.execute("SELECT id, unique_code FROM users WHERE email=%s", (qr_code,))
     user = cursor.fetchone()
     
     if user:
-        if user_code == user[1]:
+        if user_code == user[1]:  # Memeriksa apakah kode unik cocok dengan yang ada di database
             user_id = user[0]
-            user_role = user[2]
             cursor.execute("UPDATE users SET last_login=NOW() WHERE id=%s", (user_id,))
             connection.commit()
 
@@ -399,25 +344,19 @@ def login_qr():
             session['user_id'] = user_id
             session['session_token'] = generate_session_token()
 
-            if user_role == 'admin':
-                return jsonify({"status": "sukses", "role": "admin", "redirect": url_for('main.index')})
-
-            check_date = datetime.now().date()
-            cursor.execute("SELECT completed FROM health_checks WHERE user_id = %s AND check_date = %s", (user_id, check_date))
-            health_check = cursor.fetchone()
             cursor.close()
+            return jsonify({
+                "status": "sukses",
+                "user_id": user_id,
+                "redirect": url_for('main.index') 
+            })
 
-            if not health_check or not health_check[0]:
-                return jsonify({"status": "health_check_required", "user_id": user_id})
-
-            return jsonify({"status": "sukses", "user_id": user_id})
         else:
             cursor.close()
             return jsonify({"status": "gagal", "pesan": "Kode unik tidak valid"}), 401
     else:
         cursor.close()
         return jsonify({"status": "gagal", "pesan": "QR Code tidak valid"}), 401
-
 
 @auth_bp.route('/logout')
 @login_required
@@ -428,10 +367,14 @@ def logout():
 
 @auth_bp.route('/generate_qr', methods=['GET'])
 def generate_qr():
-    nik = request.args.get('nik')
+    email = request.args.get('email')
+    if not email:
+        return jsonify({"status": "gagal", "pesan": "Email tidak ditemukan"}), 404
+
     connection = get_db()
     cursor = connection.cursor()
-    cursor.execute("SELECT unique_code FROM users WHERE nik=%s", (nik,))
+    
+    cursor.execute("SELECT unique_code FROM users WHERE email=%s", (email,))
     user = cursor.fetchone()
     cursor.close()
 
@@ -453,47 +396,8 @@ def generate_qr():
 
         return send_file(buf, mimetype='image/png')
     else:
-        return jsonify({"status": "gagal", "pesan": "NIK tidak ditemukan"}), 404
+        return jsonify({"status": "gagal", "pesan": "Email tidak ditemukan"}), 404
 
-@auth_bp.route('/delete_user/<int:user_id>', methods=['POST'])
-@login_required
-def delete_user(user_id):
-    connection = get_db()
-    cursor = connection.cursor()
-
-    try:
-        # Dapatkan data pengguna yang akan dihapus dari tabel `users`
-        cursor.execute("SELECT * FROM users WHERE id=%s", (user_id,))
-        user_data = cursor.fetchone()
-
-        if user_data:
-            # Hapus data terkait dari tabel faces terlebih dahulu
-            cursor.execute("DELETE FROM faces WHERE user_id=%s", (user_id,))
-
-            # Pindahkan data pengguna ke tabel `users_backup`
-            cursor.execute("""
-                INSERT INTO users_backup (id, nik, name, email, password, registration_date, last_login, address, about, profile_image, role, unique_code)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, user_data)
-
-            # Hapus data pengguna dari tabel `users`
-            cursor.execute("DELETE FROM users WHERE id=%s", (user_id,))
-
-            connection.commit()
-            cursor.close()
-
-            flash('User berhasil dihapus dan dipindahkan ke tabel backup', 'success')
-            return redirect(url_for('main.employee_list'))
-        else:
-            cursor.close()
-            flash('User tidak ditemukan', 'danger')
-            return redirect(url_for('main.employee_list'))
-
-    except Exception as e:
-        connection.rollback()
-        cursor.close()
-        flash(f'Gagal menghapus user: {str(e)}', 'danger')
-        return redirect(url_for('main.employee_list'))
 
 def recognize_face(face_encoding):
     connection = get_db()
@@ -509,33 +413,17 @@ def recognize_face(face_encoding):
         if similarity > 0.9:  
             return user_id
     return None
-
-def send_user_id_to_esp32(user_id, esp32_ip):
-    try:
-        payload = json.dumps({'user_id': user_id})
-        headers = {'Content-Type': 'application/json'}
-        response = requests.post(f'http://{esp32_ip}/set_user_id', data=payload, headers=headers)
-        if response.status_code == 200:
-            response_json = response.json()
-            if response_json.get("status") == "sukses":
-                return True
-            else:
-                return False
-        else:
-            return False
-    except Exception as e:
-        return False
     
-@auth_bp.route('/send_session_token', methods=['POST'])
-@login_required
-def send_session_token():
-    data = request.get_json()
-    esp32_ip = data.get('esp32_ip')
-    session_token = session.get('session_token')
+# @auth_bp.route('/send_session_token', methods=['POST'])
+# @login_required
+# def send_session_token():
+#     data = request.get_json()
+#     esp32_ip = data.get('esp32_ip')
+#     session_token = session.get('session_token')
 
-    response = requests.post(f'http://{esp32_ip}/set_session_token', json={'session_token': session_token})
+#     response = requests.post(f'http://{esp32_ip}/set_session_token', json={'session_token': session_token})
 
-    if response.status_code == 200:
-        return jsonify({"status": "sukses"})
-    else:
-        return jsonify({"status": "gagal"}), 500
+#     if response.status_code == 200:
+#         return jsonify({"status": "sukses"})
+#     else:
+#         return jsonify({"status": "gagal"}), 500

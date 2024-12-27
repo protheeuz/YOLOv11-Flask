@@ -4,224 +4,232 @@
 
 {% block stylesheets %}
 <style>
-    .auth-wrapper {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh;
-    }
-    .auth-content .card {
-        width: 550px;
-        margin: auto;
-    }
-    #face-register-modal {
-        display: none; 
-        position: fixed; 
-        z-index: 9999; 
-        left: 0; 
-        top: 0; 
-        width: 100%; 
-        height: 100%; 
-        overflow: auto; 
-        background-color: rgba(0,0,0,0.8); 
-        padding-top: 60px; 
-        justify-content: center;
-        align-items: center;
-    }
-    #face-register-content {
-        background-color: transparent;
-        margin: auto;
-        padding: 20px;
-        border: none;
-        width: 50%;
-        text-align: center;
-        position: relative;
-    }
-    #video {
-        position: relative;
-        width: 100%;
-        border-radius: 15px;
-        overflow: hidden;
-    }
-    .scan-line {
-        position: absolute;
-        width: 80%;
-        height: 2px;
-        background-color: lime;
-        top: 0;
-        left: 10%;
-        animation: scan 3s infinite;
-    }
-    @keyframes scan {
-        0% { top: 10%; }
-        100% { top: 80%; }
-    }
-    .face-box {
-        position: absolute;
-        border: 2px solid lime;
-        width: 80%;
-        height: 80%;
-        top: 10%;
-        left: 10%;
-        border-radius: 15px;
-        box-shadow: 0 0 10px lime;
-    }
-    #close-modal {
-        position: absolute;
-        top: 20px;
-        right: 35px;
-        color: #fff;
-        font-size: 40px;
-        font-weight: bold;
-        transition: 0.3s;
-    }
-    #close-modal:hover,
-    #close-modal:focus {
-        color: #bbb;
-        text-decoration: none;
-        cursor: pointer;
-    }
-    #loading {
-        display: none;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: white;
-        font-size: 1.5em;
-        font-weight: bold;
-    }
+  .auth-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+  }
+  .auth-content .card {
+    width: 550px;
+    margin: auto;
+  }
+  #face-register-modal,
+  #confirmation-modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+  }
+  #face-register-content,
+  #confirmation-content {
+    background-color:  #5d6e76; /* #fff; Background putih */
+    margin: auto;
+    padding: 20px;
+    border-radius: 10px;
+    width: 400px;
+    text-align: center;
+    position: relative;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    color: #000; /* Teks warna hitam */
+  }
+  #close-modal,
+  #close-confirmation {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    color: #000; /* Teks warna hitam */
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  #video {
+    width: 100%;
+    border-radius: 15px;
+    overflow: hidden;
+  }
+  #loading {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: black;
+    font-size: 1.5em;
+    font-weight: bold;
+  }
+  .btn {
+    margin-top: 10px;
+  }
 </style>
 {% endblock stylesheets %}
 
 {% block content %}
 <div class="auth-wrapper">
-    <div class="auth-content">
-        <div class="auth-bg">
-            <span class="r"></span>
-            <span class="r s"></span>
-            <span class="r s"></span>
-            <span class="r"></span>
+  <div class="auth-content">
+    <div class="card">
+      <div class="card-body text-center">
+        <div class="mb-4">
+          <i class="feather icon-user auth-icon"></i>
         </div>
-        <div class="card">
-            <div class="card-body text-center">
-                <div class="mb-4">
-                    <i class="feather icon-user auth-icon"></i>
-                </div>
-                <h3 class="mb-4">Daftar</h3>
-                <form id="registerForm">
-                    <div class="input-group mb-3">
-                        <input type="text" name="nik" class="form-control" placeholder="NIK" required>
-                    </div>
-                    <div class="input-group mb-3">
-                        <input type="text" name="name" class="form-control" placeholder="Nama" required>
-                    </div>
-                    <div class="input-group mb-3">
-                        <input type="email" name="email" class="form-control" placeholder="Email" required>
-                    </div>
-                    <div class="input-group mb-4">
-                        <input type="password" name="password" class="form-control" placeholder="Password" required>
-                    </div>
-                    <button type="button" id="startFaceRegistration" class="btn btn-primary shadow-2 mb-4">Daftar</button>
-                </form>
-                <p id="error-message" class="text-danger"></p>
-                <p class="mb-0 text-muted">Sudah punya akun? <a href="{{ url_for('auth.login') }}">Login</a></p>
-            </div>
-        </div>
+        <h3 class="mb-4">Daftar</h3>
+        <form id="registerForm">
+          <div class="input-group mb-3">
+            <input
+              type="text"
+              name="name"
+              class="form-control"
+              placeholder="Nama"
+              required
+            />
+          </div>
+          <div class="input-group mb-3">
+            <input
+              type="email"
+              name="email"
+              class="form-control"
+              placeholder="Email"
+              required
+            />
+          </div>
+          <div class="input-group mb-4">
+            <input
+              type="password"
+              name="password"
+              class="form-control"
+              placeholder="Password"
+              required
+            />
+          </div>
+          <button
+            type="button"
+            id="startRegistration"
+            class="btn btn-primary shadow-2 mb-4"
+          >
+            Daftar
+          </button>
+        </form>
+        <p id="error-message" class="text-danger"></p>
+        <p class="mb-0 text-muted">
+          Sudah punya akun? <a href="{{ url_for('auth.login') }}">Login</a>
+        </p>
+      </div>
     </div>
+  </div>
+</div>
+
+<!-- Modal Konfirmasi -->
+<div id="confirmation-modal">
+  <div id="confirmation-content">
+    <h5>Ingin coba mendaftarkan wajah kamu gak? Agar login lebih mudah menggunakan wajah.</h5>
+    <button id="yes-register-face" class="btn btn-primary mt-3">Ya</button>
+    <button id="no-register-face" class="btn btn-secondary mt-3">Tidak</button>
+  </div>
 </div>
 
 <!-- Modal untuk pendaftaran wajah -->
 <div id="face-register-modal">
-    <div id="face-register-content">
-        <span id="close-modal">&times;</span>
-        <h2 style="color: white;">Daftarkan Wajah Anda</h2>
-        <div style="position: relative; display: inline-block;">
-            <video id="video" width="640" height="480" autoplay></video>
-            <div class="face-box"></div>
-            <div class="scan-line"></div>
-            <div id="loading">Proses encoding wajah...</div>
-        </div>
-        <button id="capture" class="btn btn-primary mt-3">Ambil Gambar Wajah</button>
-    </div>
+  <div id="face-register-content">
+    <h5>Daftarkan Wajah Anda</h5>
+    <video id="video" autoplay></video>
+    <button id="capture" class="btn btn-primary mt-3">Ambil Gambar Wajah</button>
+    <p id="loading">Proses encoding wajah...</p>
+  </div>
 </div>
 {% endblock content %}
 
 {% block javascripts %}
 <script>
-    document.getElementById('startFaceRegistration').addEventListener('click', function() {
-        const formData = new FormData(document.getElementById('registerForm'));
-        
-        fetch('{{ url_for("auth.register") }}', {
-            method: 'POST',
-            body: formData
+  document.getElementById("startRegistration").addEventListener("click", function () {
+    const form = document.getElementById("registerForm");
+    const name = form.name.value.trim();
+    const email = form.email.value.trim();
+    const password = form.password.value.trim();
+
+    if (!name || !email || !password) {
+      document.getElementById("error-message").innerText = "Semua kolom harus diisi!";
+      return;
+    }
+
+    const formData = new FormData(form);
+
+    fetch('{{ url_for("auth.register") }}', {
+      method: "POST",
+      body: formData,
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.status === "gagal") {
+          document.getElementById("error-message").innerText = data.pesan;
+        } else {
+          // Tampilkan modal konfirmasi setelah registrasi berhasil
+          document.getElementById("confirmation-modal").style.display = "flex";
+          window.localStorage.setItem("user_id", data.user_id);
+        }
+      })
+      .catch((error) => {
+        console.error("Error saat registrasi:", error);
+      });
+  });
+
+  document.getElementById("yes-register-face").addEventListener("click", function () {
+    // Tampilkan modal untuk pendaftaran wajah
+    document.getElementById("confirmation-modal").style.display = "none";
+    document.getElementById("face-register-modal").style.display = "flex";
+
+    const video = document.getElementById("video");
+    navigator.mediaDevices
+      .getUserMedia({ video: true })
+      .then(function (stream) {
+        video.srcObject = stream;
+      })
+      .catch(function (error) {
+        console.log("Tidak dapat mengakses kamera:", error);
+      });
+  });
+
+  document.getElementById("no-register-face").addEventListener("click", function () {
+    // Jika pengguna memilih untuk tidak mendaftarkan wajah, arahkan ke login
+    document.getElementById("confirmation-modal").style.display = "none";
+    window.location.href = '{{ url_for("auth.login") }}';
+  });
+
+  document.getElementById("capture").addEventListener("click", function () {
+    const canvas = document.createElement("canvas");
+    const video = document.getElementById("video");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const formData = new FormData();
+    canvas.toBlob(function (blob) {
+      formData.append("face_image", blob);
+      formData.append("user_id", window.localStorage.getItem("user_id"));
+      fetch('{{ url_for("auth.register_face") }}', {
+        method: "POST",
+        body: formData,
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.status === "sukses") {
+            alert("Wajah berhasil didaftarkan!");
+            window.location.href = '{{ url_for("auth.login") }}';
+          } else {
+            alert(data.pesan);
+          }
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'gagal') {
-                document.getElementById('error-message').innerText = data.pesan;
-            } else {
-                document.getElementById('error-message').innerText = '';
-                document.getElementById('face-register-modal').style.display = 'flex';
-                window.localStorage.setItem('user_id', data.user_id);
-                
-                const video = document.getElementById('video');
-                if (navigator.mediaDevices.getUserMedia) {
-                    navigator.mediaDevices.getUserMedia({ video: true })
-                        .then(function (stream) {
-                            video.srcObject = stream;
-                        })
-                        .catch(function (error) {
-                            console.log("Something went wrong!");
-                        });
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
+        .catch((error) => {
+          console.error("Error saat proses pengambilan wajah:", error);
         });
-    });
+    }, "image/png");
+  });
 
-    document.getElementById('capture').addEventListener('click', function() {
-        const canvas = document.createElement('canvas');
-        const video = document.getElementById('video');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        document.getElementById('loading').style.display = 'block';
-        document.getElementById('capture').style.display = 'none';
-
-        canvas.toBlob(function(blob) {
-            const formData = new FormData();
-            formData.append('face_image', blob);
-            formData.append('user_id', window.localStorage.getItem('user_id'));
-
-            fetch('{{ url_for("auth.register_face") }}', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('loading').style.display = 'none';
-                if (data.status === 'sukses') {
-                    alert('Wajah berhasil didaftarkan!');
-                    window.location.href = '{{ url_for("auth.login") }}';
-                } else {
-                    alert(data.pesan);
-                    document.getElementById('capture').style.display = 'block';
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('capture').style.display = 'block';
-            });
-        }, 'image/png');
-    });
-
-    document.getElementById('close-modal').addEventListener('click', function() {
-        document.getElementById('face-register-modal').style.display = 'none';
-    });
 </script>
 {% endblock javascripts %}

@@ -1,4 +1,3 @@
-# app.py
 import os
 import warnings
 from wsgiref import headers
@@ -32,7 +31,7 @@ CORS(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'auth.login'  # Tentukan endpoint login
+login_manager.login_view = 'auth.login' 
 
 # Tambahkan konfigurasi 'UPLOAD_FOLDER'
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
@@ -44,7 +43,7 @@ def load_user(user_id):
 @app.context_processor
 def inject_user():
     new_logins_count = 0
-    if current_user.is_authenticated and current_user.role == 'admin':
+    if current_user.is_authenticated:
         new_logins_count = get_new_logins_count()
     return dict(current_user=current_user, new_logins_count=new_logins_count)
 

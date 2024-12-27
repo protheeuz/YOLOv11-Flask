@@ -5,9 +5,9 @@
             <a href="/" class="b-brand">
                 <div class="">
                     <!-- Ganti ikon dengan gambar logo -->
-                    <img src="{{ url_for('static', filename='assets/images/sintaprima.png') }}" alt="Logo" class="logo">
+                    <img src="{{ url_for('static', filename='assets/images/logo.png') }}" alt="Logo" class="logo">
                 </div>
-                <span class="b-title">S. Prima Feedmill</span>
+                <span class="b-title">FDS System - Fahmi</span>
             </a>
             <a class="mobile-menu" id="mobile-collapse" href="javascript:"><span></span></a>
         </div>
@@ -24,33 +24,7 @@
                         <span class="pcoded-micon"><i class="feather icon-user"></i></span>
                         <span class="pcoded-mtext">Halaman Profil</span>
                     </a>
-                </li>
-
-                {% if current_user.role == 'admin' %}
-                <li class="nav-item pcoded-menu-caption">
-                    <label>Riwayat Kesehatan</label>
-                </li>
-                <li data-username="riwayat kesehatan semua karyawan" class="nav-item {% if 'riwayat' in segment %} active {% endif %}">
-                    <a href="{{ url_for('main.riwayat') }}" class="nav-link">
-                        <span class="pcoded-micon"><i class="feather icon-activity"></i></span>
-                        <span class="pcoded-mtext">Riwayat Semua Karyawan</span>
-                    </a>
-                </li>
-                <li data-username="Daftar Karyawan" class="nav-item {% if 'employee_list' in segment %} active {% endif %}">
-                    <a href="/employee_list" class="nav-link"><span class="pcoded-micon"><i class="feather icon-users"></i></span><span class="pcoded-mtext">Daftar Karyawan</span></a>
-                </li>
-                {% else %}
-                <li class="nav-item pcoded-menu-caption">
-                    <label>Riwayat Kesehatan Saya</label>
-                </li>
-                <li data-username="riwayat kesehatan" class="nav-item {% if 'riwayat_karyawan' in segment %} active {% endif %}">
-                    <a href="{{ url_for('main.riwayat_karyawan', user_id=current_user.id) }}" class="nav-link">
-                        <span class="pcoded-micon"><i class="feather icon-activity"></i></span>
-                        <span class="pcoded-mtext">Riwayat Kesehatan Saya</span>
-                    </a>
-                </li>
-                {% endif %}
-
+                </li>     
                 <li class="nav-item pcoded-menu-caption">
                     <label>Lainnya</label>
                 </li>

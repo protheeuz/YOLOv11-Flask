@@ -1,686 +1,363 @@
-{% extends "layouts/base-fullscreen.html" %}
-
-{% block title %}Login{% endblock %}
-
-{% block stylesheets %}
+{% extends "layouts/base-fullscreen.html" %} {% block title %}Login{% endblock
+%} {% block stylesheets %}
 <style>
-    .auth-wrapper {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh;
+  .auth-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+  }
+  .auth-content .card {
+    width: 550px;
+  }
+  #qr-code {
+    display: block;
+    margin: auto;
+    margin-top: 20px;
+  }
+  #codeInput {
+    margin-top: 20px;
+  }
+  #face-login-modal {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.8);
+    justify-content: center;
+    align-items: center;
+  }
+  #face-login-content {
+    background-color: transparent;
+    margin: auto;
+    padding: 20px;
+    border: none;
+    width: 50%;
+    text-align: center;
+    position: relative;
+  }
+  #login-video {
+    position: relative;
+    width: 100%;
+    border-radius: 15px;
+    overflow: hidden;
+  }
+  .scan-line {
+    position: absolute;
+    width: 80%;
+    height: 2px;
+    background-color: lime;
+    top: 0;
+    left: 10%;
+    animation: scan 3s infinite;
+  }
+  @keyframes scan {
+    0% {
+      top: 10%;
     }
-    .auth-content .card {
-        width: 550px;
+    100% {
+      top: 80%;
     }
-    #qr-code {
-        display: block;
-        margin: auto;
-        margin-top: 20px; 
-    }
-    #codeInput {
-        margin-top: 20px;
-    }
-    #face-login-modal {
-        display: none; 
-        position: fixed; 
-        z-index: 9999; 
-        left: 0; 
-        top: 0; 
-        width: 100%; 
-        height: 100%; 
-        overflow: auto; 
-        background-color: rgba(0,0,0,0.8); 
-        justify-content: center;
-        align-items: center;
-    }
-    #face-login-content {
-        background-color: transparent;
-        margin: auto;
-        padding: 20px;
-        border: none;
-        width: 50%;
-        text-align: center;
-        position: relative;
-    }
-    #login-video {
-        position: relative;
-        width: 100%;
-        border-radius: 15px;
-        overflow: hidden;
-    }
-    .scan-line {
-        position: absolute;
-        width: 80%;
-        height: 2px;
-        background-color: lime;
-        top: 0;
-        left: 10%;
-        animation: scan 3s infinite;
-    }
-    @keyframes scan {
-        0% { top: 10%; }
-        100% { top: 80%; }
-    }
-    .face-box {
-        position: absolute;
-        border: 2px solid lime;
-        width: 80%;
-        height: 80%;
-        top: 10%;
-        left: 10%;
-        border-radius: 15px;
-        box-shadow: 0 0 10px lime;
-    }
-    #close-modal-login {
-        position: absolute;
-        top: 20px;
-        right: 35px;
-        color: #fff;
-        font-size: 40px;
-        font-weight: bold;
-        transition: 0.3s;
-    }
-    #close-modal-login:hover,
-    #close-modal-login:focus {
-        color: #bbb;
-        text-decoration: none;
-        cursor: pointer;
-    }
-    #loading-login {
-        display: none;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: white;
-        font-size: 1.5em;
-        font-weight: bold;
-    }
-    #healthCheckModal .modal-content {
-        background-color: #333;
-        color: white;
-    }
-    #retryECGCheck {
-        display: none;
-        margin-top: 10px;
-    }
+  }
+  .face-box {
+    position: absolute;
+    border: 2px solid lime;
+    width: 80%;
+    height: 80%;
+    top: 10%;
+    left: 10%;
+    border-radius: 15px;
+    box-shadow: 0 0 10px lime;
+  }
+  #close-modal-login {
+    position: absolute;
+    top: 20px;
+    right: 35px;
+    color: #fff;
+    font-size: 40px;
+    font-weight: bold;
+    transition: 0.3s;
+  }
+  #close-modal-login:hover,
+  #close-modal-login:focus {
+    color: #bbb;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  #loading-login {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 1.5em;
+    font-weight: bold;
+  }
 </style>
-{% endblock stylesheets %}
-
-{% block content %}
+{% endblock stylesheets %} {% block content %}
 <div class="auth-wrapper">
-    <div class="auth-content">
-        <div class="auth-bg">
-            <span class="r"></span>
-            <span class="r s"></span>
-            <span class="r s"></span>
-            <span class="r"></span>
-        </div>
-        <div class="card">
-            <div class="card-body text-center">
-                <div class="mb-4">
-                    <i class="feather icon-unlock auth-icon"></i>
-                </div>
-                <h3 class="mb-4">Masuk</h3>
-                {% if msg %}
-                    <div class="alert alert-danger" id="error-message">{{ msg }}</div>
-                {% else %}
-                    <div class="alert alert-danger" id="error-message" style="display: none;"></div>
-                {% endif %}
-                <form id="loginForm" action="{{ url_for('auth.login') }}" method="POST">
-                    <div class="input-group mb3">
-                        <input type="text" class="form-control" id="nik" name="nik" placeholder="NIK" required>
-                    </div>
-                    <div class="input-group mb-4">
-                        <input type="password" class="form-control" id="password" name="password" placeholder="Kata Sandi" required>
-                    </div>
-                    <!-- <input type="hidden" name="esp32_ip" value="192.168.20.184"> -->
-                    <div class="d-flex justify-content-end mb-4">
-                        <a href="{{ url_for('auth.forgot_password') }}" class="btn btn-link p-0">Lupa Password?</a>
-                    </div>
-                    <button type="submit" class="btn btn-primary shadow-2 mb-4">Login</button>
-                </form>
-                <hr>
-                <div class="text-center">
-                    <button id="faceLoginBtn" class="btn btn-secondary btn-block">Login dengan Wajah</button>
-                    <button id="qrLoginBtn" class="btn btn-secondary btn-block">Login dengan QR Code</button>
-                    <img id="qr-code" src="" alt="QR Code" style="display: none;">
-                    <div id="codeInput" style="display: none;">
-                        <input type="text" id="userCode" placeholder="Masukkan kode unik Anda" class="form-control mb-2">
-                        <button id="submitCodeBtn" class="btn btn-primary btn-block">Submit Kode</button>
-                    </div>
-                </div>
-                <hr>
-                <div class="text-center">
-                    <a href="{{ url_for('auth.register') }}" class="btn btn-link">Daftar</a>
-                </div>
-            </div>
-        </div>
+  <div class="auth-content">
+    <div class="auth-bg">
+      <span class="r"></span>
+      <span class="r s"></span>
+      <span class="r s"></span>
+      <span class="r"></span>
     </div>
+    <div class="card">
+      <div class="card-body text-center">
+        <div class="mb-4">
+          <i class="feather icon-unlock auth-icon"></i>
+        </div>
+        <h3 class="mb-4">Masuk</h3>
+        {% if msg %}
+        <div class="alert alert-danger" id="error-message">{{ msg }}</div>
+        {% else %}
+        <div
+          class="alert alert-danger"
+          id="error-message"
+          style="display: none"
+        ></div>
+        {% endif %}
+        <form id="loginForm" action="{{ url_for('auth.login') }}" method="POST">
+          <div class="input-group mb3">
+            <input
+              type="email"
+              class="form-control"
+              id="email"
+              name="email"
+              placeholder="Email"
+              required
+            />
+          </div>
+          <div class="input-group mb-4">
+            <input
+              type="password"
+              class="form-control"
+              id="password"
+              name="password"
+              placeholder="Password"
+              required
+            />
+          </div>
+          <div class="d-flex justify-content-end mb-4">
+            <a
+              href="{{ url_for('auth.forgot_password') }}"
+              class="btn btn-link p-0"
+              >Lupa Password?</a
+            >
+          </div>
+          <button type="submit" class="btn btn-primary shadow-2 mb-4">
+            Login
+          </button>
+        </form>
+        <hr />
+        <div class="text-center">
+          <button id="faceLoginBtn" class="btn btn-secondary btn-block">
+            Login dengan Wajah
+          </button>
+          <button id="qrLoginBtn" class="btn btn-secondary btn-block">
+            Login dengan QR Code
+          </button>
+          <img id="qr-code" src="" alt="QR Code" style="display: none" />
+          <div id="codeInput" style="display: none">
+            <input
+              type="text"
+              id="userCode"
+              placeholder="Masukkan kode unik Anda"
+              class="form-control mb-2"
+            />
+            <button id="submitCodeBtn" class="btn btn-primary btn-block">
+              Masukkan Kode
+            </button>
+          </div>
+        </div>
+        <hr />
+        <div class="text-center">
+          <a href="{{ url_for('auth.register') }}" class="btn btn-link"
+            >Daftar</a
+          >
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Modal untuk login wajah -->
 <div id="face-login-modal">
-    <div id="face-login-content">
-        <span id="close-modal-login">&times;</span>
-        <h2 style="color: white;">Login dengan Wajah</h2>
-        <div style="position: relative; display: inline-block;">
-            <video id="login-video" width="640" height="480" autoplay></video>
-            <div class="face-box"></div>
-            <div class="scan-line"></div>
-            <div id="loading-login">Sedang memproses wajah...</div>
-        </div>
+  <div id="face-login-content">
+    <span id="close-modal-login">&times;</span>
+    <h2 style="color: white">Login dengan Wajah</h2>
+    <div style="position: relative; display: inline-block">
+      <video id="login-video" width="640" height="480" autoplay></video>
+      <div class="face-box"></div>
+      <div class="scan-line"></div>
+      <div id="loading-login">Sedang memproses wajah...</div>
     </div>
+  </div>
 </div>
-
-<!-- Modal untuk pengecekan kesehatan -->
-<div class="modal fade" id="healthCheckModal" tabindex="-1" role="dialog" aria-labelledby="healthCheckModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="healthCheckModalLabel">Pengecekan Kesehatan - PT. Sinta Prima Feedmill</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Tutup">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <p>PENGECEKAN KESEHATAN</p>
-                <div id="health-check-step-1" style="display: none;">
-                    <p>DETAK JANTUNG: <span id="HeartRateValue">-</span></p>
-                    <p>Tempatkan jari Anda pada infra-merah yang ada pada sensor, tahan beberapa saat sampai mendapatkan hasil.</p>
-                    <button type="button" class="btn btn-primary" id="startHeartRateCheck">Cek sekarang</button>
-                    <button type="button" class="btn btn-secondary" id="retryHeartRateCheck" style="display: none;">Coba Lagi</button>
-                    <button type="button" class="btn btn-secondary" id="nextStep1" style="display: none;">Selanjutnya</button>
-                </div>
-                <div id="health-check-step-2" style="display: none;">
-                    <p>LEVEL OKSIGEN: <span id="OxygenLevelValue">-</span></p>
-                    <p>Tempatkan jari Anda pada infra-merah yang ada pada sensor, tahan beberapa saat sampai mendapatkan hasil.</p>
-                    <button type="button" class="btn btn-primary" id="startOxygenLevelCheck">Cek sekarang</button>
-                    <button type="button" class="btn btn-secondary" id="retryOxygenLevelCheck" style="display: none;">Coba Lagi</button>
-                    <button type="button" class="btn btn-secondary" id="nextStep2" style="display: none;">Selanjutnya</button>
-                </div>
-                <div id="health-check-step-3" style="display: none;">
-                    <p>TEMPERATUR: <span id="TemperatureValue">-</span></p>
-                    <p>Pastikan sensor temperatur berada di lingkungan yang stabil, tahan beberapa saat sampai mendapatkan hasil.</p>
-                    <button type="button" class="btn btn-primary" id="startTemperatureCheck">Cek sekarang</button>
-                    <button type="button" class="btn btn-secondary" id="retryTemperatureCheck" style="display: none;">Coba Lagi</button>
-                    <button type="button" class="btn btn-secondary" id="nextStep3" style="display: none;">Selanjutnya</button>
-                </div>
-                <div id="health-check-step-4" style="display: none;">
-                    <p>LEVEL AKTIVITAS: <span id="ActivityLevelValue">-</span></p>
-                    <p>Lakukan beberapa gerakan ringan seperti menggoyangkan tangan atau kaki untuk mengukur aktivitas Anda.</p>
-                    <button type="button" class="btn btn-primary" id="startActivityLevelCheck">Cek sekarang</button>
-                    <button type="button" class="btn btn-secondary" id="retryActivityLevelCheck" style="display: none;">Coba Lagi</button>
-                    <button type="button" class="btn btn-secondary" id="nextStep4" style="display: none;">Selanjutnya</button>
-                </div>
-                <div id="health-check-step-5" style="display: none;">
-                    <p>ECG: <span id="ECGValue">-</span></p>
-                    <p>Tempel elektroda dengan baik, pastikan menempel pada kulit. Tahan beberapa saat sampai mendapatkan hasil.</p>
-                    <button type="button" class="btn btn-primary" id="startECGCheck">Cek sekarang</button>
-                    <div id="ecgDataStatus" style="display: none;">Mengumpulkan data ECG...</div>
-                    <button type="button" class="btn btn-secondary" id="retryECGCheck" style="display: none;">Coba Lagi</button>
-                    <button type="button" class="btn btn-secondary" id="nextStep5" style="display: none;">Selanjutnya</button>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" id="skipHealthCheck">Lewati Pengecekan</button>
-                <button type="button" class="btn btn-primary" id="submitHealthCheck" style="display: none;">Submit</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-{% endblock content %}
-
-{% block javascripts %}
+{% endblock content %} {% block javascripts %}
 <script>
-    document.getElementById('faceLoginBtn').addEventListener('click', function() {
-        document.getElementById('face-login-modal').style.display = 'flex';
-        const video = document.getElementById('login-video');
-        
-        if (navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ video: true })
-                .then(function (stream) {
-                    video.srcObject = stream;
-                    video.play();
-                    setTimeout(function() {
-                        document.getElementById('loading-login').style.display = 'block';
-                        fetch('{{ url_for("auth.login_face") }}', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            }
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.status === 'sukses') {
-                                // Tutup modal dan arahkan ke dashboard yang sesuai
-                                document.getElementById('face-login-modal').style.display = 'none';
-                                window.location.href = data.redirect;
-                            } else if (data.status === 'health_check_required') {
-                                // Tutup modal login wajah dan buka modal pengecekan kesehatan
-                                document.getElementById('face-login-modal').style.display = 'none';
-                                $('#healthCheckModal').modal('show');
-                                updateHealthCheckSteps(data.user_id);
-                            } else {
-                                alert('Login wajah gagal: ' + data.pesan);
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error:', error);
-                        })
-                        .finally(() => {
-                            document.getElementById('loading-login').style.display = 'none';
-                        });
-                    }, 3000);
-                })
-                .catch(function (error) {
-                    console.log("Something went wrong!");
-                });
-        }
-    });
+  document
+    .getElementById("faceLoginBtn")
+    .addEventListener("click", function () {
+      document.getElementById("face-login-modal").style.display = "flex";
+      const video = document.getElementById("login-video");
 
-    document.getElementById('skipHealthCheck').addEventListener('click', function() {
-        fetch('{{ url_for("main.skip_health_check") }}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'sukses') {
-                window.location.href = data.redirect;
-            } else {
-                alert('Gagal melewati pengecekan kesehatan.');
-            }
-        })
-        .catch(error => console.error('Error:', error));
-    });
-
-    document.getElementById('qrLoginBtn').addEventListener('click', function() {
-        const nik = document.getElementById('nik').value;
-        if (!nik) {
-            document.getElementById('error-message').innerText = 'Silakan masukkan NIK terlebih dahulu.';
-            document.getElementById('error-message').style.display = 'block';
-            return;
-        }
-
-        document.getElementById('error-message').style.display = 'none';
-        
-        fetch('{{ url_for("auth.generate_qr") }}?nik=' + nik)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('NIK tidak ditemukan');
-            }
-            return response.blob();
-        })
-        .then(blob => {
-            const url = URL.createObjectURL(blob);
-            const qrCodeImg = document.getElementById('qr-code');
-            qrCodeImg.src = url;
-            qrCodeImg.style.display = 'block';
-            document.getElementById('codeInput').style.display = 'block';
-        })
-        .catch(error => {
-            document.getElementById('error-message').innerText = 'NIK memang belum tersedia pada sistem.';
-            document.getElementById('error-message').style.display = 'block';
-            console.error('Error:', error);
-        });
-    });
-
-    document.getElementById('submitCodeBtn').addEventListener('click', function() {
-        const userCode = document.getElementById('userCode').value;
-        if (userCode) {
-            fetch('{{ url_for("auth.login_qr") }}', {
-                method: 'POST',
+      if (navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices
+          .getUserMedia({ video: true })
+          .then(function (stream) {
+            video.srcObject = stream;
+            video.play();
+            setTimeout(function () {
+              document.getElementById("loading-login").style.display = "block";
+              fetch('{{ url_for("auth.login_face") }}', {
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json'
+                  "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ qr_code: document.getElementById('nik').value, user_code: userCode })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'sukses') {
+              })
+                .then((response) => response.json())
+                .then((data) => {
+                  if (data.status === "success") {
+                    document.getElementById("face-login-modal").style.display =
+                      "none";
                     window.location.href = data.redirect;
-                } else if (data.status === 'health_check_required') {
-                    $('#healthCheckModal').modal('show');
-                    updateHealthCheckSteps(data.user_id);
-                } else {
-                    alert('Login QR Code gagal: ' + (data.pesan || 'Tidak diketahui.'));
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Login QR Code gagal: ' + error.message);
-            });
-        }
+                  } else {
+                    alert("Login wajah gagal: " + data.message);
+                  }
+                })
+                .catch((error) => {
+                  console.error("Error:", error);
+                })
+                .finally(() => {
+                  document.getElementById("loading-login").style.display =
+                    "none";
+                });
+            }, 3000);
+          })
+          .catch(function (error) {
+            console.log("Something went wrong!");
+          });
+      }
     });
 
-    document.getElementById('close-modal-login').addEventListener('click', function() {
-        document.getElementById('face-login-modal').style.display = 'none';
+  document.getElementById("qrLoginBtn").addEventListener("click", function () {
+    const email = document.getElementById("email").value;
+    if (!email) {
+      document.getElementById("error-message").innerText =
+        "Silakan masukkan email terlebih dahulu.";
+      document.getElementById("error-message").style.display = "block";
+      return;
+    }
+
+    document.getElementById("error-message").style.display = "none";
+
+    fetch(
+      '{{ url_for("auth.generate_qr") }}?email=' + encodeURIComponent(email)
+    )
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Email tidak ditemukan");
+        }
+        return response.blob();
+      })
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        const qrCodeImg = document.getElementById("qr-code");
+        qrCodeImg.src = url;
+        qrCodeImg.style.display = "block";
+        document.getElementById("codeInput").style.display = "block";
+      })
+      .catch((error) => {
+        document.getElementById("error-message").innerText =
+          "Email tidak terdaftar pada sistem.";
+        document.getElementById("error-message").style.display = "block";
+        console.error("Error:", error);
+      });
+  });
+
+  document
+    .getElementById("submitCodeBtn")
+    .addEventListener("click", function () {
+      const userCode = document.getElementById("userCode").value;
+      const email = document.getElementById("email").value;
+
+      if (!userCode || !email) {
+        alert("Silakan masukkan kode unik dan email.");
+        return;
+      }
+
+      fetch('{{ url_for("auth.login_qr") }}', {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          qr_code: email,
+          user_code: userCode,
+        }),
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.status === "sukses") {
+            window.location.href = data.redirect;
+          } else {
+            alert(
+              "Login QR Code gagal: " + (data.message || "Kode unik salah")
+            );
+          }
+        })
+        .catch((error) => {
+          console.error("Error:", error);
+          alert("Login QR Code gagal: " + error.message);
+        });
     });
 
-    document.addEventListener('DOMContentLoaded', (event) => {
-        document.body.classList.add('dark');
+  document
+    .getElementById("close-modal-login")
+    .addEventListener("click", function () {
+      document.getElementById("face-login-modal").style.display = "none";
     });
 
-    function checkHealthStatus(user_id, role) {
-        if (role === 'admin') {
-            window.location.href = '{{ url_for("main.index") }}?user_id=' + user_id;
-            return;
-        }
+  document.addEventListener("DOMContentLoaded", (event) => {
+    document.body.classList.add("dark");
+  });
 
-        fetch('{{ url_for("main.health_check") }}')
-        .then(response => response.json())
-        .then(data => {
-            if (data.health_check_completed) {
-                window.location.href = '{{ url_for("main.index") }}?user_id=' + user_id;
-            } else {
-                $('#healthCheckModal').modal('show');
-                updateHealthCheckSteps();
-            }
+  document
+    .getElementById("loginForm")
+    .addEventListener("submit", function (event) {
+      event.preventDefault();
+      const formData = new FormData(this);
+      fetch(this.action, {
+        method: "POST",
+        body: formData,
+      })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("Login failed");
+          }
+          return response.json();
         })
-        .catch(error => console.error('Error:', error));
-    }
-
-    function sendUserIdToESP32(user_id) {
-        const esp32_ip = '192.168.20.184';
-        fetch('/auth/send_user_id', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ esp32_ip: esp32_ip, user_id: user_id })
+        .then((data) => {
+          if (data.redirect) {
+            window.location.href = data.redirect;
+          } else {
+            document.getElementById("error-message").innerText =
+              data.message || "Terjadi kesalahan saat login";
+            document.getElementById("error-message").style.display = "block";
+          }
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'sukses') {
-                console.log('User ID berhasil dikirim ke ESP32');
-            } else {
-                console.error('Gagal mengirim User ID ke ESP32');
-            }
-        })
-        .catch(error => console.error('Error:', error));
-    }
-
-    function sendSessionTokenToESP32(session_token) {
-        const esp32_ip = '192.168.20.184';
-        fetch('/auth/send_session_token', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ esp32_ip: esp32_ip, session_token: session_token })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'sukses') {
-                console.log('Session Token berhasil dikirim ke ESP32');
-            } else {
-                console.error('Gagal mengirim Session Token ke ESP32');
-            }
-        })
-        .catch(error => console.error('Error:', error));
-    }
-
-    document.getElementById('loginForm').addEventListener('submit', function(event) {
-        event.preventDefault();
-        const formData = new FormData(this);
-        fetch(this.action, {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'sukses') {
-                sendUserIdToESP32(data.user_id);
-                checkHealthStatus(data.user_id, 'admin');
-            } else if (data.status === 'health_check_required') {
-                $('#healthCheckModal').modal('show');
-                updateHealthCheckSteps();
-            } else {
-                document.getElementById('error-message').innerText = data.message;
-                document.getElementById('error-message').style.display = 'block';
-            }
-        })
-        .catch(error => console.error('Error:', error));
-    });
-
-    function updateHealthCheckSteps() {
-        const healthStatus = {{ health_status | tojson | default({}) }};
-        console.log("Health Status:", healthStatus);
-
-        // Hanya tampilkan tahap yang belum selesai
-        if (!healthStatus.heart_rate) {
-            document.getElementById('health-check-step-1').style.display = 'block';
-            return;
-        }
-
-        if (!healthStatus.oxygen_level) {
-            document.getElementById('health-check-step-2').style.display = 'block';
-            return;
-        }
-
-        if (!healthStatus.temperature) {
-            document.getElementById('health-check-step-3').style.display = 'block';
-            return;
-        }
-
-        if (!healthStatus.activity_level) {
-            document.getElementById('health-check-step-4').style.display = 'block';
-            return;
-        }
-
-        if (!healthStatus.ecg) {
-            document.getElementById('health-check-step-5').style.display = 'block';
-            return;
-        }
-
-        // Semua data sudah didapatkan, langsung kirim data dan redirect
-        submitHealthCheckData();
-    }
-
-    function submitHealthCheckData() {
-        const formData = {
-            heart_rate: document.getElementById('HeartRateValue').innerText.split(': ')[1],
-            oxygen_level: document.getElementById('OxygenLevelValue').innerText.split(': ')[1],
-            temperature: document.getElementById('TemperatureValue').innerText.split(': ')[1],
-            activity_level: document.getElementById('ActivityLevelValue').innerText.split(': ')[1],
-            ecg_value: document.getElementById('ECGValue').innerText.split(': ')[1]
-        };
-
-        fetch('{{ url_for("main.sensor_data") }}', {
-            method: "POST",
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(formData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'sukses') {
-                window.location.href = '{{ url_for("main.index_karyawan") }}';
-            } else {
-                alert('Gagal menyimpan data kesehatan');
-            }
-        })
-        .catch(error => console.error('Error:', error));
-    }
-
-    document.addEventListener('DOMContentLoaded', (event) => {
-        updateHealthCheckSteps();
-    });
-
-    document.addEventListener('DOMContentLoaded', (event) => {
-        let currentStep = 1;
-        const esp32_ip = '192.168.20.184';
-
-        function startCheck(step, sensor) {
-            const button = document.getElementById(`start${step}Check`);
-            const retryButton = document.getElementById(`retry${step}Check`);
-            const valueSpan = document.getElementById(`${step}Value`);
-            const nextButton = document.getElementById(`nextStep${currentStep}`);
-            const ecgStatus = document.getElementById('ecgDataStatus');
-            button.disabled = true;
-            retryButton.style.display = 'none';
-            ecgStatus.style.display = 'none';
-            let timeLeft = 10;
-            const timer = setInterval(() => {
-                button.innerText = `Mengambil data (${timeLeft--}s)`;
-                if (timeLeft < 0) {
-                    clearInterval(timer);
-                    fetch('/request_sensor_data', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ esp32_ip, sensor })
-                    })
-                    .then(response => {
-                        return response.text().then(text => {
-                            try {
-                                return JSON.parse(text);
-                            } catch (error) {
-                                console.error('Error parsing JSON:', text);
-                                throw new Error('Invalid JSON received');
-                            }
-                        });
-                    })
-                    .then(data => {
-                        console.log(`Data received for ${sensor}:`, data);
-                        if (data.status === 'sukses') {
-                            if (sensor === 'ecg') {
-                                ecgStatus.innerText = data['message'];
-                                ecgStatus.style.display = 'block';
-                            } else {
-                                valueSpan.innerText = data[sensor];
-                                nextButton.style.display = 'block'; // Tampilkan tombol Selanjutnya jika data sudah didapat
-                            }
-                        } else {
-                            valueSpan.innerText = 'Gagal: ' + data.message;
-                            retryButton.style.display = 'block';
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        valueSpan.innerText = 'Gagal: ' + error.message;
-                        retryButton.style.display = 'block';
-                    })
-                    .finally(() => {
-                        button.disabled = false;
-                        button.innerText = 'Cek sekarang';
-                    });
-                }
-            }, 1000);
-        }
-
-        document.getElementById('startHeartRateCheck').addEventListener('click', function() {
-            startCheck('HeartRate', 'heart_rate');
-        });
-
-        document.getElementById('retryHeartRateCheck').addEventListener('click', function() {
-            startCheck('HeartRate', 'heart_rate');
-        });
-
-        document.getElementById('startOxygenLevelCheck').addEventListener('click', function() {
-            startCheck('OxygenLevel', 'oxygen_level');
-        });
-
-        document.getElementById('retryOxygenLevelCheck').addEventListener('click', function() {
-            startCheck('OxygenLevel', 'oxygen_level');
-        });
-
-        document.getElementById('startTemperatureCheck').addEventListener('click', function() {
-            startCheck('Temperature', 'temperature');
-        });
-
-        document.getElementById('retryTemperatureCheck').addEventListener('click', function() {
-            startCheck('Temperature', 'temperature');
-        });
-
-        document.getElementById('startActivityLevelCheck').addEventListener('click', function() {
-            startCheck('ActivityLevel', 'activity_level');
-        });
-
-        document.getElementById('retryActivityLevelCheck').addEventListener('click', function() {
-            startCheck('ActivityLevel', 'activity_level');
-        });
-
-        document.getElementById('startECGCheck').addEventListener('click', function() {
-            const button = document.getElementById('startECGCheck');
-            const retryButton = document.getElementById('retryECGCheck');
-            const valueSpan = document.getElementById('ECGValue');
-            const nextButton = document.getElementById('nextStep5');
-            const ecgStatus = document.getElementById('ecgDataStatus');
-            button.disabled = true;
-            retryButton.style.display = 'none';
-            ecgStatus.style.display = 'block';
-
-            fetch('/request_sensor_data', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ esp32_ip, sensor: 'ecg' })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'sukses') {
-                    ecgStatus.innerText = 'Pengumpulan data ECG berhasil dimulai.';
-                    nextButton.style.display = 'block';
-                } else {
-                    ecgStatus.innerText = 'Gagal: ' + data.message;
-                    retryButton.style.display = 'block';
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                ecgStatus.innerText = 'Gagal: ' + error.message;
-                retryButton.style.display = 'block';
-            })
-            .finally(() => {
-                button.disabled = false;
-                ecgStatus.style.display = 'none';
-            });
-        });
-
-        document.getElementById('retryECGCheck').addEventListener('click', function() {
-            startCheck('ECG', 'ecg');
-        });
-
-        document.getElementById('submitHealthCheck').addEventListener('click', function() {
-            submitHealthCheckData();
-        });
-
-        document.getElementById('nextStep1').addEventListener('click', function() {
-            document.getElementById('health-check-step-1').style.display = 'none';
-            document.getElementById('health-check-step-2').style.display = 'block';
-            currentStep = 2;
-        });
-
-        document.getElementById('nextStep2').addEventListener('click', function() {
-            document.getElementById('health-check-step-2').style.display = 'none';
-            document.getElementById('health-check-step-3').style.display = 'block';
-            currentStep = 3;
-        });
-
-        document.getElementById('nextStep3').addEventListener('click', function() {
-            document.getElementById('health-check-step-3').style.display = 'none';
-            document.getElementById('health-check-step-4').style.display = 'block';
-            currentStep = 4;
-        });
-
-        document.getElementById('nextStep4').addEventListener('click', function() {
-            document.getElementById('health-check-step-4').style.display = 'none';
-            document.getElementById('health-check-step-5').style.display = 'block';
-            currentStep = 5;
-        });
-
-        document.getElementById('nextStep5').addEventListener('click', function() {
-            document.getElementById('health-check-step-5').style.display = 'none';
-            submitHealthCheckData();
+        .catch((error) => {
+          document.getElementById("error-message").innerText =
+            "Email atau password salah";
+          document.getElementById("error-message").style.display = "block";
+          console.error("Error:", error);
         });
     });
 </script>
