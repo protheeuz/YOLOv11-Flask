@@ -1,33 +1,52 @@
-import json
-import logging
-from flask import Blueprint, flash, render_template, redirect, url_for, request, jsonify, current_app, session
+import os
+import cv2
+from flask import Blueprint, Response, flash, render_template, redirect, url_for, request, jsonify, current_app
 from flask_login import login_required, current_user, login_user
 from database import get_db
 from models import User
-from datetime import datetime, timedelta
+from detection import detect_and_label, generate_frames, process_video
 from werkzeug.utils import secure_filename
-import os
 
 main_bp = Blueprint('main', __name__)
 
 @main_bp.route('/')
 @login_required
 def index():
-    user_id = request.args.get('user_id') or current_user.id
+    user_id = current_user.id
+
+    # Query statistik deteksi dari database
     connection = get_db()
     cursor = connection.cursor()
 
     cursor.execute("""
-        SELECT id, name, registration_date
-        FROM users
-        WHERE registration_date >= DATE_SUB(NOW(), INTERVAL 2 WEEK)
-        ORDER BY registration_date DESC
-    """)
-    recent_users = cursor.fetchall()
+        SELECT COUNT(*) AS daily 
+        FROM detections 
+        WHERE user_id = %s AND DATE(time) = CURDATE()
+    """, (user_id,))
+    daily_count = cursor.fetchone()[0]
+
+    cursor.execute("""
+        SELECT COUNT(*) AS weekly 
+        FROM detections 
+        WHERE user_id = %s AND YEARWEEK(time) = YEARWEEK(NOW())
+    """, (user_id,))
+    weekly_count = cursor.fetchone()[0]
+
+    cursor.execute("""
+        SELECT COUNT(*) AS monthly 
+        FROM detections 
+        WHERE user_id = %s AND MONTH(time) = MONTH(NOW()) AND YEAR(time) = YEAR(NOW())
+    """, (user_id,))
+    monthly_count = cursor.fetchone()[0]
 
     cursor.close()
 
-    return render_template('home/index_admin.html', recent_users=recent_users)
+    return render_template(
+        'home/index.html',
+        daily_count=daily_count,
+        weekly_count=weekly_count,
+        monthly_count=monthly_count
+    )
 
 @main_bp.route('/profile')
 @login_required
@@ -37,17 +56,14 @@ def profile():
 @main_bp.route('/update_profile', methods=['POST'])
 @login_required
 def update_profile():
-    # Mengambil data dari form
     name = request.form['name']
     address = request.form['address']
     about = request.form['about']
-    phone = request.form.get('phone')  # Mengambil nomor telepon (baru)
+    phone = request.form.get('phone')
 
-    # Membuka koneksi ke database
     connection = get_db()
     cursor = connection.cursor()
 
-    # Update query untuk menyertakan kolom phone
     cursor.execute("""
         UPDATE users
         SET name = %s, address = %s, about = %s, phone = %s
@@ -61,7 +77,6 @@ def update_profile():
     login_user(user)
 
     flash('Profil berhasil diperbarui.', 'success')
-
     return redirect(url_for('main.profile'))
 
 @main_bp.route('/update_profile_image', methods=['POST'])
@@ -94,16 +109,105 @@ def save_profile_image(image_file):
     image_file.save(filepath)
     return 'uploads/' + filename
 
-@main_bp.route('/notifications')
+@main_bp.route('/riwayat')
 @login_required
-def notifications():
-    return jsonify({"error": "Unauthorized"}), 403
+def riwayat():
+    user_id = current_user.id
 
-@main_bp.route('/dashboard/<int:user_id>')
+    connection = get_db()
+    cursor = connection.cursor()
+    cursor.execute("""
+        SELECT label, confidence, time
+        FROM detections
+        WHERE user_id = %s
+        ORDER BY time DESC
+    """, (user_id,))
+    detection_history = cursor.fetchall()
+    cursor.close()
+
+    return render_template('home/riwayat.html', detection_history=detection_history)
+
+@main_bp.route('/list-detections')
 @login_required
-def dashboard(user_id):
-    return redirect(url_for('main.index'))
+def list_detections():
+    user_id = current_user.id
 
-@main_bp.route('/riwayat/<int:user_id>')
-def riwayat(user_id):
-    return render_template('home/riwayat.html', user_id=user_id)
+    connection = get_db()
+    cursor = connection.cursor()
+    cursor.execute("""
+        SELECT confidence, time, image_path
+        FROM detections
+        WHERE user_id = %s AND label = 'fall'
+        ORDER BY time DESC
+    """, (user_id,))
+    detections = cursor.fetchall()
+    cursor.close()
+
+    formatted_detections = [{'confidence': row[0], 'time': row[1], 'image_path': row[2]} for row in detections]
+
+    return render_template('home/list_detections.html', detections=formatted_detections)
+
+@main_bp.route('/stream/<path:video_source>')
+@login_required
+def stream(video_source):
+    """
+    Streaming video dengan deteksi bounding box.
+    """
+    def generate():
+        cap = cv2.VideoCapture(video_source)
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            frame = detect_and_label(frame, current_user.id)
+
+            _, buffer = cv2.imencode('.jpg', frame)
+            frame_bytes = buffer.tobytes()
+
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+        cap.release()
+
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@main_bp.route('/detect/upload', methods=['GET', 'POST'])
+@login_required
+def detect_upload():
+    """
+    Proses video yang diunggah.
+    """
+    if request.method == 'POST':
+        video_file = request.files.get('video')
+        if not video_file:
+            flash('Harap unggah file video.', 'danger')
+            return redirect(url_for('main.detect_upload'))
+
+        filename = secure_filename(video_file.filename)
+        input_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+        video_file.save(input_path)
+
+        output_path = os.path.join(current_app.config['UPLOAD_FOLDER'], f"output_{filename}")
+        process_video(input_path, output_path, current_user.id)
+
+        flash('Video berhasil diproses. Silakan unduh hasilnya.', 'success')
+        return render_template('home/detect_upload.html', output_path=f"uploads/output_{filename}")
+
+    return render_template('home/detect_upload.html')
+
+@main_bp.route('/detect/realtime_rtsp', methods=['POST'])
+@login_required
+def detect_realtime_rtsp():
+    """
+    Proses deteksi real-time dengan RTSP.
+    """
+    rtsp_url = request.form.get('rtsp_url')
+    if not rtsp_url:
+        flash("URL RTSP diperlukan untuk memulai deteksi real-time.", "danger")
+        return redirect(url_for('main.detect_upload'))
+
+    return render_template(
+        'home/detect_upload.html',
+        rtsp_url=rtsp_url
+    )

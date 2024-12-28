@@ -13,22 +13,48 @@
         </div>
         <div class="navbar-content scroll-div">
             <ul class="nav pcoded-inner-navbar">
+                <!-- Beranda -->
                 <li class="nav-item pcoded-menu-caption">
                     <label>Beranda</label>
                 </li>
-                <li data-username="dashboard Default Ecommerce CRM Analytics Crypto Project" class="nav-item {% if 'index' in segment %} active {% endif %}">
+                <li data-username="dashboard" class="nav-item {% if 'index' in segment %} active {% endif %}">
                     <a href="/" class="nav-link"><span class="pcoded-micon"><i class="feather icon-home"></i></span><span class="pcoded-mtext">Dashboard</span></a>
                 </li>
-                <li data-username="Profile Page" class="nav-item {% if 'profile' in segment %} active {% endif %}">
+                <li data-username="profile" class="nav-item {% if 'profile' in segment %} active {% endif %}">
                     <a href="/profile" class="nav-link">
                         <span class="pcoded-micon"><i class="feather icon-user"></i></span>
                         <span class="pcoded-mtext">Halaman Profil</span>
                     </a>
                 </li>     
+
+                <!-- Deteksi -->
+                <li class="nav-item pcoded-menu-caption">
+                    <label>Deteksi</label>
+                </li>
+                <li data-username="list-detection" class="nav-item {% if 'list_detections' in segment %} active {% endif %}">
+                    <a href="{{ url_for('main.list_detections') }}" class="nav-link">
+                        <span class="pcoded-micon"><i class="feather icon-image"></i></span>
+                        <span class="pcoded-mtext">List Pendeteksian</span>
+                    </a>
+                </li>
+                <li data-username="history" class="nav-item {% if 'history' in segment %} active {% endif %}">
+                    <a href="{{ url_for('main.riwayat') }}" class="nav-link">
+                        <span class="pcoded-micon"><i class="feather icon-clipboard"></i></span>
+                        <span class="pcoded-mtext">Riwayat Pendeteksian</span>
+                    </a>
+                </li>
+                <li data-username="detection" class="nav-item {% if 'detection' in segment %} active {% endif %}">
+                    <a href="{{ url_for('main.detect_upload') }}" class="nav-link">
+                        <span class="pcoded-micon"><i class="feather icon-video"></i></span>
+                        <span class="pcoded-mtext">Halaman Deteksi</span>
+                    </a>
+                </li>
+
+                <!-- Lainnya -->
                 <li class="nav-item pcoded-menu-caption">
                     <label>Lainnya</label>
                 </li>
-                <li data-username="Disabled Menu" class="nav-item">
+                <li data-username="logout" class="nav-item">
                     <a href="{{ url_for('auth.logout') }}" class="nav-link">
                         <span class="pcoded-micon"><i class="feather icon-power"></i></span>
                         <span class="pcoded-mtext">Keluar</span>

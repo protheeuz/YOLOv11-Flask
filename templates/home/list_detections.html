@@ -1,0 +1,36 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}List Pendeteksian{% endblock %}
+
+{% block content %}
+<div class="pcoded-main-container">
+    <div class="pcoded-wrapper">
+        <div class="pcoded-content">
+            <div class="pcoded-inner-content">
+                <div class="main-body">
+                    <div class="page-wrapper">
+                        <div class="row">
+                            <div class="col-md-12">
+                                <h4 class="mb-4">List Pendeteksian Jatuh</h4>
+                                <div class="row">
+                                    {% for detection in detections %}
+                                    <div class="col-md-4">
+                                        <div class="card">
+                                            <img src="{{ url_for('static', filename=detection.image_path) }}" class="card-img-top" alt="Detection Image">
+                                            <div class="card-body">
+                                                <h5 class="card-title">Confidence: {{ detection.confidence }}%</h5>
+                                                <p class="card-text">Waktu: {{ detection.time }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

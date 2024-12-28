@@ -1,0 +1,87 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Halaman Deteksi{% endblock %}
+
+{% block content %}
+<div class="pcoded-main-container">
+    <div class="pcoded-wrapper">
+        <div class="pcoded-content">
+            <div class="pcoded-inner-content">
+                <div class="main-body">
+                    <div class="page-wrapper">
+                        <div class="row">
+                            <!-- Unggah Video untuk Deteksi -->
+                            <div class="col-md-6">
+                                <h4 class="mb-4">Unggah Video untuk Deteksi</h4>
+                                <form action="{{ url_for('main.detect_upload') }}" method="POST" enctype="multipart/form-data">
+                                    <div class="form-group">
+                                        <label for="video">Pilih Video</label>
+                                        <input type="file" name="video" id="video" class="form-control" accept="video/*" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Proses Video</button>
+                                </form>
+                            </div>
+
+                            <!-- Hubungkan ke RTSP untuk Deteksi Real-time -->
+                            <div class="col-md-6">
+                                <h4 class="mb-4">Hubungkan RTSP untuk Deteksi Real-time</h4>
+                                <form action="{{ url_for('main.detect_realtime_rtsp') }}" method="POST">
+                                    <div class="form-group">
+                                        <label for="rtsp_url">Masukkan URL RTSP</label>
+                                        <input type="text" name="rtsp_url" id="rtsp_url" class="form-control" placeholder="rtsp://192.168.1.100:554/stream" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-success">Mulai Deteksi</button>
+                                </form>
+                                
+                                <!-- Panduan untuk pengguna -->
+                                <div class="mt-4">
+                                    <h6>Panduan untuk kamu nih:</h6>
+                                    <ul>
+                                        <li>Pastiin kamera CCTV kamu mendukung protokol <strong>RTSP</strong>.</li>
+                                        <li>Masukkan URL RTSP dalam format berikut:
+                                            <ul>
+                                                <li><code>rtsp://<IP_ADDRESS>:<PORT>/<STREAM_PATH></code></li>
+                                            </ul>
+                                        </li>
+                                        <li>Contoh URL:
+                                            <ul>
+                                                <li><code>rtsp://192.168.1.100:554/stream</code></li>
+                                                <li><code>rtsp://admin:password@192.168.1.100:554/h264/main/av_stream</code></li>
+                                            </ul>
+                                        </li>
+                                        <li>Jika kamu gak yakin sama URL RTSP, periksa manual kamera atau gunakan aplikasi seperti VLC untuk memverifikasi URL.</li>
+                                    </ul>
+                                </div>
+
+                                {% if rtsp_url %}
+                                <div class="mt-4">
+                                    <h5>Hasil Deteksi Real-time</h5>
+                                    <div class="video-frame" style="position: relative; overflow: hidden; border: 1px solid #000;">
+                                        <img id="rtsp-stream" src="{{ url_for('main.stream', video_source=rtsp_url) }}" alt="RTSP Stream" style="width: 100%;">
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Hasil Video yang Diproses -->
+                        {% if output_path %}
+                        <div class="row mt-4">
+                            <div class="col-md-12">
+                                <h5>Hasil Video yang Diproses</h5>
+                                <div class="video-frame" style="position: relative; overflow: hidden; border: 1px solid #000;">
+                                    <video id="processed-video" controls autoplay style="width: 100%;">
+                                        <source src="{{ url_for('static', filename=output_path) }}" type="video/mp4">
+                                        Browser kamu gak mendukung pemutar video.
+                                    </video>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

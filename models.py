@@ -2,11 +2,13 @@ from flask_login import UserMixin
 from database import get_db
 from datetime import datetime
 
+
 class User(UserMixin):
-    def __init__(self, id, name, email, address=None, about=None, profile_image=None):
+    def __init__(self, id, name, email, phone=None, address=None, about=None, profile_image=None):
         self.id = id
         self.name = name
         self.email = email
+        self.phone = phone
         self.address = address
         self.about = about
         self.profile_image = profile_image
@@ -16,7 +18,7 @@ class User(UserMixin):
         connection = get_db()
         cursor = connection.cursor()
         cursor.execute("""
-            SELECT id, name, email, address, about, profile_image
+            SELECT id, name, email, phone, address, about, profile_image
             FROM users 
             WHERE id=%s
         """, (user_id,))
@@ -24,7 +26,9 @@ class User(UserMixin):
         cursor.close()
         if not user:
             return None
-        return User(user[0], user[1], user[2], user[3], user[4], user[5])
+        # Sesuaikan urutan atribut dengan query SELECT
+        return User(user[0], user[1], user[2], user[3], user[4], user[5], user[6])
+
 
 class Notification:
     def __init__(self, user_id, message, created_at, read=False):

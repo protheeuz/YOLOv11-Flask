@@ -123,7 +123,7 @@
                                             <div class="profile-image-container w-50 p-3">
                                                 <form action="{{ url_for('main.update_profile_image') }}" method="post" enctype="multipart/form-data" id="profileImageForm">
                                                     <label for="profile_image">
-                                                        <img src="{{ url_for('static', filename=current_user.profile_image or 'assets/images/user/profile.jpg') }}" alt="profile image"
+                                                        <img src="{{ url_for('static', filename=current_user.profile_image or 'assets/images/user/profile.png') }}" alt="profile image"
                                                             class="img-fluid rounded-circle">
                                                     </label>
                                                     <input type="file" name="profile_image" id="profile_image" onchange="document.getElementById('profileImageForm').submit();">

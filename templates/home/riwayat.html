@@ -1,6 +1,6 @@
 {% extends "layouts/base.html" %}
 
-{% block title %} Data Riwayat {% endblock %}
+{% block title %}Riwayat Pendeteksian{% endblock %}
 
 {% block content %}
 <div class="pcoded-main-container">
@@ -10,93 +10,28 @@
                 <div class="main-body">
                     <div class="page-wrapper">
                         <div class="row">
-                            <div class="col-sm-12">
-                                <!-- Kolom pencarian nama -->
-                                <div class="mb-3">
-                                    <input type="text" id="searchInput" class="form-control" placeholder="Cari Nama Karyawan...">
-                                </div>
-                                <!-- Date picker untuk rentang tanggal -->
-                                <div class="mb-3 row">
-                                    <div class="col">
-                                        <input type="date" id="startDate" class="form-control" placeholder="Mulai Tanggal">
-                                    </div>
-                                    <div class="col">
-                                        <input type="date" id="endDate" class="form-control" placeholder="Sampai Tanggal">
-                                    </div>
-                                </div>
-
-                                {% for date, data in riwayat_data.items() %}
-                                <div class="card mt-4 riwayat-card" data-date="{{ date }}">
-                                    <div class="card-header">
-                                        <h5>Data Riwayat - {{ date }}</h5>
-                                    </div>
-                                    <div class="card-body">
-                                        <table class="table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Nama Karyawan</th>
-                                                    <th>Detak Jantung</th>
-                                                    <th>Kadar Oksigen</th>
-                                                    <th>Suhu</th>
-                                                    <th>Tingkat Aktivitas</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr>
-                                                    <td>{{ data['name'] }}</td>
-                                                    <td>{{ data['heart_rate'] }}</td>
-                                                    <td>{{ data['oxygen_level'] }}</td>
-                                                    <td>{{ data['temperature'] }}</td>
-                                                    <td>{{ data['activity_level'] }}</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-
-                                        {% if data['ecg_values'] %}
-                                        <div class="mt-4">
-                                            <canvas id="ecgChart-{{ loop.index }}"></canvas>
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-
-                                <script>
-                                document.addEventListener('DOMContentLoaded', function () {
-                                    const ctx = document.getElementById('ecgChart-{{ loop.index }}').getContext('2d');
-                                    const ecgChart = new Chart(ctx, {
-                                        type: 'line',
-                                        data: {
-                                            labels: {{ data['ecg_timestamps']|tojson }},
-                                            datasets: [{
-                                                label: 'ECG Value',
-                                                data: {{ data['ecg_values']|tojson }},
-                                                borderColor: 'rgba(75, 192, 192, 1)',
-                                                borderWidth: 1,
-                                                fill: false,
-                                            }]
-                                        },
-                                        options: {
-                                            scales: {
-                                                x: {
-                                                    type: 'category',
-                                                    title: {
-                                                        display: true,
-                                                        text: 'Waktu'
-                                                    }
-                                                },
-                                                y: {
-                                                    title: {
-                                                        display: true,
-                                                        text: 'Nilai ECG'
-                                                    },
-                                                    beginAtZero: true
-                                                }
-                                            }
-                                        }
-                                    });
-                                });
-                                </script>
-                                {% endfor %}
+                            <div class="col-md-12">
+                                <h4 class="mb-4">Riwayat Deteksi Jatuh</h4>
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>No.</th>
+                                            <th>Waktu</th>
+                                            <th>Confidence</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for detection in detection_history %}
+                                        <tr>
+                                            <td>{{ loop.index }}</td>
+                                            <td>{{ detection.time }}</td>
+                                            <td>{{ detection.confidence }}%</td>
+                                            <td>{{ detection.label }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -106,41 +41,3 @@
     </div>
 </div>
 {% endblock content %}
-
-{% block javascripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-    function filterResults() {
-        var searchValue = document.getElementById('searchInput').value.toLowerCase();
-        var startDate = document.getElementById('startDate').value;
-        var endDate = document.getElementById('endDate').value;
-        var cards = document.querySelectorAll('.riwayat-card');
-
-        cards.forEach(function(card) {
-            var nameCell = card.querySelector('td:nth-child(1)').innerText.toLowerCase();
-            var cardDate = card.getAttribute('data-date');
-
-            var nameMatch = nameCell.includes(searchValue);
-            var dateMatch = true;
-
-            if (startDate && endDate) {
-                dateMatch = (cardDate >= startDate && cardDate <= endDate);
-            } else if (startDate) {
-                dateMatch = (cardDate >= startDate);
-            } else if (endDate) {
-                dateMatch = (cardDate <= endDate);
-            }
-
-            if (nameMatch && dateMatch) {
-                card.style.display = '';
-            } else {
-                card.style.display = 'none';
-            }
-        });
-    }
-
-    document.getElementById('searchInput').addEventListener('input', filterResults);
-    document.getElementById('startDate').addEventListener('input', filterResults);
-    document.getElementById('endDate').addEventListener('input', filterResults);
-</script>
-{% endblock javascripts %}

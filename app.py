@@ -35,6 +35,8 @@ login_manager.login_view = 'auth.login'
 
 # Tambahkan konfigurasi 'UPLOAD_FOLDER'
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
+app.config['DETECTION_IMAGES_FOLDER'] = os.path.join(app.root_path, 'static/uploads/detections')
+
 
 @login_manager.user_loader
 def load_user(user_id):
