@@ -1,3 +1,4 @@
+## detection.py
 import os
 import cv2
 from ultralytics import YOLO
@@ -6,13 +7,13 @@ from database import get_db
 import time
 
 # Load YOLO model
-model_path = "models/yolov11/best.pt" 
+model_path = "models/yolov11/fall-detection-model.pt" 
 model = YOLO(model_path)
 
 # Mapping label untuk penggantian nama kelas (pastikan sesuai urutan RoboFlow)
 LABEL_MAP = {
-    "stand": "Normal",  # fall
-    "fall": "Jatuh"  # stand
+    0: "Jatuh",  # Mengganti kelas dengan indeks 0 menjadi "Jatuh"
+    1: "Normal"  # Mengganti kelas dengan indeks 1 menjadi "Normal"
 }
 
 CONFIDENCE_THRESHOLD = 0.7
@@ -21,7 +22,6 @@ def generate_frames(video_source, user_id):
     cap = cv2.VideoCapture(video_source)
     if not cap.isOpened():
         raise ValueError(f"Tidak dapat membuka video atau URL RTSP: {video_source}")
-    
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -55,7 +55,7 @@ def detect_and_label(frame, user_id):
     for result in results:
         if hasattr(result, "boxes"):
             for box in result.boxes:
-                # Pastikan menggunakan akses yang benar untuk bounding box
+                # Ambil bounding box dan informasi deteksi
                 x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
                 confidence = box.conf[0].item()
                 class_id = int(box.cls[0].item())
@@ -162,6 +162,5 @@ def run_realtime_detection(user_id, rtsp_url=None, video_file=None):
         except Exception as e:
             print(f"Kesalahan saat deteksi realtime: {e}")
             break
-
     cap.release()
     cv2.destroyAllWindows()

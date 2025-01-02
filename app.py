@@ -7,7 +7,6 @@ from flask_cors import CORS
 # Menonaktifkan operasi khusus oneDNN untuk TensorFlow
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Mengurangi log peringatan TensorFlow
-
 # Mengabaikan peringatan DeprecationWarning
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
