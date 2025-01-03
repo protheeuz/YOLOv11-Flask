@@ -19,6 +19,7 @@
                                             <th>Waktu</th>
                                             <th>Confidence</th>
                                             <th>Status</th>
+                                            <th>Gambar</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -28,6 +29,17 @@
                                             <td>{{ detection.time }}</td>
                                             <td>{{ detection.confidence }}%</td>
                                             <td>{{ detection.label }}</td>
+                                            <td>
+                                                {% if detection.image_path %}
+                                                    <img src="{{ url_for('static', filename=detection.image_path) }}" 
+                                                         alt="Detection Image" 
+                                                         style="max-width: 100px; height: auto;"
+                                                         onclick="window.open(this.src)"
+                                                         class="cursor-pointer">
+                                                {% else %}
+                                                    <span>-</span>
+                                                {% endif %}
+                                            </td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
@@ -40,4 +52,10 @@
         </div>
     </div>
 </div>
+
+<style>
+.cursor-pointer {
+    cursor: pointer;
+}
+</style>
 {% endblock content %}

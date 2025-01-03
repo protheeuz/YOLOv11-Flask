@@ -117,12 +117,22 @@ def riwayat():
     connection = get_db()
     cursor = connection.cursor()
     cursor.execute("""
-        SELECT label, confidence, time
+        SELECT time, confidence, label, image_path
         FROM detections
         WHERE user_id = %s
         ORDER BY time DESC
     """, (user_id,))
-    detection_history = cursor.fetchall()
+    
+    # Mengubah hasil query menjadi list of dictionaries
+    detection_history = [
+        {
+            'time': row[0],
+            'confidence': row[1],
+            'label': row[2],
+            'image_path': row[3]
+        }
+        for row in cursor.fetchall()
+    ]
     cursor.close()
 
     return render_template('home/riwayat.html', detection_history=detection_history)
@@ -140,12 +150,18 @@ def list_detections():
         WHERE user_id = %s AND label = 'fall'
         ORDER BY time DESC
     """, (user_id,))
-    detections = cursor.fetchall()
+    
+    detections = [
+        {
+            'confidence': row[0],
+            'time': row[1],
+            'image_path': row[2]
+        }
+        for row in cursor.fetchall()
+    ]
     cursor.close()
 
-    formatted_detections = [{'confidence': row[0], 'time': row[1], 'image_path': row[2]} for row in detections]
-
-    return render_template('home/list_detections.html', detections=formatted_detections)
+    return render_template('home/list_detections.html', detections=detections)
 
 @main_bp.route('/stream/<path:video_source>')
 @login_required
@@ -193,7 +209,6 @@ def detect_upload():
 
         flash('Video berhasil diproses. Silakan unduh hasilnya.', 'success')
         return render_template('home/detect_upload.html', output_path=f"uploads/output_{filename}")
-
     return render_template('home/detect_upload.html')
 
 @main_bp.route('/detect/realtime_rtsp', methods=['POST'])

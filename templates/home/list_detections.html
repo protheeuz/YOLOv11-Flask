@@ -12,11 +12,57 @@
                         <div class="row">
                             <div class="col-md-12">
                                 <h4 class="mb-4">List Pendeteksian Jatuh</h4>
+                                
+                                <!-- Tabel -->
+                                <div class="card mb-4">
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover">
+                                                <thead>
+                                                    <tr>
+                                                        <th>No.</th>
+                                                        <th>Gambar</th>
+                                                        <th>Waktu</th>
+                                                        <th>Confidence</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for detection in detections %}
+                                                    <tr>
+                                                        <td>{{ loop.index }}</td>
+                                                        <td>
+                                                            {% if detection.image_path %}
+                                                                <img src="{{ url_for('static', filename=detection.image_path) }}" 
+                                                                    alt="Detection Image" 
+                                                                    style="max-width: 100px; height: auto;"
+                                                                    onclick="window.open(this.src)"
+                                                                    class="cursor-pointer">
+                                                            {% else %}
+                                                                <span>-</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>{{ detection.time }}</td>
+                                                        <td>{{ detection.confidence }}%</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Grid Cards -->
                                 <div class="row">
                                     {% for detection in detections %}
-                                    <div class="col-md-4">
+                                    <div class="col-md-4 mb-4">
                                         <div class="card">
-                                            <img src="{{ url_for('static', filename=detection.image_path) }}" class="card-img-top" alt="Detection Image">
+                                            {% if detection.image_path %}
+                                                <img src="{{ url_for('static', filename=detection.image_path) }}" 
+                                                     class="card-img-top cursor-pointer" 
+                                                     alt="Detection Image"
+                                                     onclick="window.open(this.src)"
+                                                     style="height: 200px; object-fit: cover;">
+                                            {% endif %}
                                             <div class="card-body">
                                                 <h5 class="card-title">Confidence: {{ detection.confidence }}%</h5>
                                                 <p class="card-text">Waktu: {{ detection.time }}</p>
@@ -33,4 +79,10 @@
         </div>
     </div>
 </div>
+
+<style>
+.cursor-pointer {
+    cursor: pointer;
+}
+</style>
 {% endblock content %}
