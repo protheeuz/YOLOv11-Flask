@@ -1,4 +1,3 @@
-## detection.py
 import os
 import cv2
 from ultralytics import YOLO
@@ -39,14 +38,30 @@ def generate_frames(video_source, user_id):
             break
     cap.release()
 
-def save_detection_to_db(user_id, label, confidence):
-    if label.lower() == "jatuh": 
+def save_frame_with_bbox(frame, frame_count, user_id):
+    """
+    Menyimpan frame full dengan bounding box untuk laporan email.
+    """
+    image_filename = f"fall_{user_id}_{int(time.time())}_{frame_count}_bbox.jpg"
+    image_path = os.path.join(current_app.config['DETECTION_IMAGES_FOLDER'], image_filename)
+    cv2.imwrite(image_path, frame)
+    return image_path
+    # image_filename = f"fall_{user_id}_{int(time.time())}_{frame_count}_bbox.jpg"
+    # image_path = os.path.join(current_app.config['DETECTION_IMAGES_FOLDER'], image_filename)
+    # cv2.imwrite(image_path, frame)
+    # return f"uploads/detections/{image_filename}"
+
+def save_detection_to_db(user_id, label, confidence, image_path=None):
+    """
+    Menyimpan data deteksi ke database.
+    """
+    if label.lower() == "jatuh":
         connection = get_db()
         cursor = connection.cursor()
         cursor.execute("""
-            INSERT INTO detections (user_id, label, confidence)
-            VALUES (%s, %s, %s)
-        """, (user_id, label, confidence))
+            INSERT INTO detections (user_id, label, confidence, image_path)
+            VALUES (%s, %s, %s, %s)
+        """, (user_id, label, confidence, image_path))
         connection.commit()
         cursor.close()
 
@@ -66,7 +81,7 @@ def detect_and_label(frame, user_id):
                 # Ambil nama label berdasarkan indeks
                 label = LABEL_MAP.get(class_id, f"Unknown-{class_id}")
                 
-                # Simpan ke database jika label adalah 'jatuh'
+                # Simpan ke database
                 save_detection_to_db(user_id, label, confidence)
 
                 # Gambar bounding box dan label pada frame
@@ -75,7 +90,7 @@ def detect_and_label(frame, user_id):
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
     return frame
 
-def process_video(input_path, output_path, user_id):
+def process_video(input_path, output_path, user_id, save_for_email=False):
     """
     Proses video yang diunggah untuk mendeteksi objek.
     """
@@ -93,6 +108,9 @@ def process_video(input_path, output_path, user_id):
     frame_count = 0
     connection = get_db()
     cursor = connection.cursor()
+
+    highest_confidence = 0.0  # Confidence tertinggi
+    email_frame_path = None  # Path gambar full frame untuk email
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -115,22 +133,23 @@ def process_video(input_path, output_path, user_id):
 
                         label = LABEL_MAP.get(class_id, f"Unknown-{class_id}")
 
-                        # Simpan ke database jika label adalah 'jatuh'
-                        if label.lower() == "jatuh":
-                            cropped_image = frame[y1:y2, x1:x2]
-                            image_filename = f"fall_{user_id}_{int(time.time())}_{frame_count}.jpg"
-                            image_path = os.path.join(current_app.config['UPLOAD_FOLDER'], image_filename)
-                            cv2.imwrite(image_path, cropped_image)
-
-                            cursor.execute("""
-                                INSERT INTO detections (user_id, label, confidence, image_path)
-                                VALUES (%s, %s, %s, %s)
-                            """, (user_id, label, confidence, image_path))
-
                         # Gambar bounding box dan label pada frame
                         cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                         cv2.putText(frame, f"{label} ({confidence:.2f})", (x1, y1 - 10),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+                        # Simpan data ke database
+                        cropped_image = frame[y1:y2, x1:x2]
+                        cropped_filename = f"fall_{user_id}_{int(time.time())}_{frame_count}.jpg"
+                        cropped_path = os.path.join(current_app.config['DETECTION_IMAGES_FOLDER'], cropped_filename)
+                        cv2.imwrite(cropped_path, cropped_image)
+                        relative_cropped_path = f"uploads/detections/{cropped_filename}"
+                        save_detection_to_db(user_id, label, confidence, relative_cropped_path)
+
+                        # Update gambar full frame untuk email jika ini confidence tertinggi
+                        if label.lower() == "jatuh" and confidence > highest_confidence and save_for_email:
+                            highest_confidence = confidence
+                            email_frame_path = save_frame_with_bbox(frame, frame_count, user_id)
 
             # Tulis frame yang telah diproses ke video keluaran
             out.write(frame)
@@ -142,25 +161,6 @@ def process_video(input_path, output_path, user_id):
     cursor.close()
     cap.release()
     out.release()
+
     print(f"Video output disimpan ke: {output_path}")
-
-def run_realtime_detection(user_id, rtsp_url=None, video_file=None):
-    input_source = rtsp_url if rtsp_url else video_file
-    cap = cv2.VideoCapture(input_source)
-    if not cap.isOpened():
-        raise ValueError(f"Tidak dapat membuka video atau RTSP: {input_source}")
-
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-        try:
-            frame = detect_and_label(frame, user_id)
-            cv2.imshow("Fall Detection Realtime", frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-        except Exception as e:
-            print(f"Kesalahan saat deteksi realtime: {e}")
-            break
-    cap.release()
-    cv2.destroyAllWindows()
+    return email_frame_path 

@@ -1,5 +1,8 @@
-{% extends "layouts/base-fullscreen.html" %} {% block title %}Login{% endblock
-%} {% block stylesheets %}
+{% extends "layouts/base-fullscreen.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block stylesheets %}
 <style>
   .auth-wrapper {
     display: flex;
@@ -18,96 +21,12 @@
   #codeInput {
     margin-top: 20px;
   }
-  #face-login-modal {
-    display: none;
-    position: fixed;
-    z-index: 9999;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    background-color: rgba(0, 0, 0, 0.8);
-    justify-content: center;
-    align-items: center;
-  }
-  #face-login-content {
-    background-color: transparent;
-    margin: auto;
-    padding: 20px;
-    border: none;
-    width: 50%;
-    text-align: center;
-    position: relative;
-  }
-  #login-video {
-    position: relative;
-    width: 100%;
-    border-radius: 15px;
-    overflow: hidden;
-  }
-  .scan-line {
-    position: absolute;
-    width: 80%;
-    height: 2px;
-    background-color: lime;
-    top: 0;
-    left: 10%;
-    animation: scan 3s infinite;
-  }
-  @keyframes scan {
-    0% {
-      top: 10%;
-    }
-    100% {
-      top: 80%;
-    }
-  }
-  .face-box {
-    position: absolute;
-    border: 2px solid lime;
-    width: 80%;
-    height: 80%;
-    top: 10%;
-    left: 10%;
-    border-radius: 15px;
-    box-shadow: 0 0 10px lime;
-  }
-  #close-modal-login {
-    position: absolute;
-    top: 20px;
-    right: 35px;
-    color: #fff;
-    font-size: 40px;
-    font-weight: bold;
-    transition: 0.3s;
-  }
-  #close-modal-login:hover,
-  #close-modal-login:focus {
-    color: #bbb;
-    text-decoration: none;
-    cursor: pointer;
-  }
-  #loading-login {
-    display: none;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: white;
-    font-size: 1.5em;
-    font-weight: bold;
-  }
 </style>
-{% endblock stylesheets %} {% block content %}
+{% endblock stylesheets %}
+
+{% block content %}
 <div class="auth-wrapper">
   <div class="auth-content">
-    <div class="auth-bg">
-      <span class="r"></span>
-      <span class="r s"></span>
-      <span class="r s"></span>
-      <span class="r"></span>
-    </div>
     <div class="card">
       <div class="card-body text-center">
         <div class="mb-4">
@@ -117,11 +36,7 @@
         {% if msg %}
         <div class="alert alert-danger" id="error-message">{{ msg }}</div>
         {% else %}
-        <div
-          class="alert alert-danger"
-          id="error-message"
-          style="display: none"
-        ></div>
+        <div class="alert alert-danger" id="error-message" style="display: none"></div>
         {% endif %}
         <form id="loginForm" action="{{ url_for('auth.login') }}" method="POST">
           <div class="input-group mb3">
@@ -157,9 +72,10 @@
         </form>
         <hr />
         <div class="text-center">
-          <button id="faceLoginBtn" class="btn btn-secondary btn-block">
+          <!-- Pastikan tombol Login dengan Wajah dijaga agar aman jika dikomentar -->
+          <!-- <button id="faceLoginBtn" class="btn btn-secondary btn-block">
             Login dengan Wajah
-          </button>
+          </button> -->
           <button id="qrLoginBtn" class="btn btn-secondary btn-block">
             Login dengan QR Code
           </button>
@@ -186,67 +102,19 @@
     </div>
   </div>
 </div>
+{% endblock content %}
 
-<!-- Modal untuk login wajah -->
-<div id="face-login-modal">
-  <div id="face-login-content">
-    <span id="close-modal-login">&times;</span>
-    <h2 style="color: white">Login dengan Wajah</h2>
-    <div style="position: relative; display: inline-block">
-      <video id="login-video" width="640" height="480" autoplay></video>
-      <div class="face-box"></div>
-      <div class="scan-line"></div>
-      <div id="loading-login">Sedang memproses wajah...</div>
-    </div>
-  </div>
-</div>
-{% endblock content %} {% block javascripts %}
+{% block javascripts %}
 <script>
-  document
-    .getElementById("faceLoginBtn")
-    .addEventListener("click", function () {
-      document.getElementById("face-login-modal").style.display = "flex";
-      const video = document.getElementById("login-video");
-
-      if (navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices
-          .getUserMedia({ video: true })
-          .then(function (stream) {
-            video.srcObject = stream;
-            video.play();
-            setTimeout(function () {
-              document.getElementById("loading-login").style.display = "block";
-              fetch('{{ url_for("auth.login_face") }}', {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-              })
-                .then((response) => response.json())
-                .then((data) => {
-                  if (data.status === "success") {
-                    document.getElementById("face-login-modal").style.display =
-                      "none";
-                    window.location.href = data.redirect;
-                  } else {
-                    alert("Login wajah gagal: " + data.message);
-                  }
-                })
-                .catch((error) => {
-                  console.error("Error:", error);
-                })
-                .finally(() => {
-                  document.getElementById("loading-login").style.display =
-                    "none";
-                });
-            }, 3000);
-          })
-          .catch(function (error) {
-            console.log("Something went wrong!");
-          });
-      }
+  // Amankan agar tidak error jika faceLoginBtn dikomentar
+  const faceLoginBtn = document.getElementById("faceLoginBtn");
+  if (faceLoginBtn) {
+    faceLoginBtn.addEventListener("click", function () {
+      alert("Login dengan wajah belum aktif.");
     });
+  }
 
+  // Login dengan QR Code
   document.getElementById("qrLoginBtn").addEventListener("click", function () {
     const email = document.getElementById("email").value;
     if (!email) {
@@ -319,33 +187,21 @@
         });
     });
 
-  document
-    .getElementById("close-modal-login")
-    .addEventListener("click", function () {
-      document.getElementById("face-login-modal").style.display = "none";
-    });
-
-  document.addEventListener("DOMContentLoaded", (event) => {
-    document.body.classList.add("dark");
-  });
-
+  // Login form handler
   document
     .getElementById("loginForm")
     .addEventListener("submit", function (event) {
       event.preventDefault();
       const formData = new FormData(this);
+
       fetch(this.action, {
         method: "POST",
         body: formData,
       })
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error("Login failed");
-          }
-          return response.json();
-        })
+        .then((response) => response.json())
         .then((data) => {
-          if (data.redirect) {
+          if (data.status === "sukses" && data.redirect) {
+            // Redirect ke URL yang diterima dari respons JSON
             window.location.href = data.redirect;
           } else {
             document.getElementById("error-message").innerText =

@@ -1,176 +1,320 @@
-{% extends "layouts/base.html" %}
-
-{% block title %}Dashboard Deteksi Jatuh{% endblock %}
-
-{% block stylesheets %}{% endblock stylesheets %}
-
-{% block content %}
+{% extends "layouts/base.html" %} {% block title %}Dashboard Deteksi Jatuh{%
+endblock %} {% block stylesheets %}{% endblock stylesheets %} {% block content
+%}
 <div class="pcoded-main-container">
-    <div class="pcoded-wrapper">
-        <div class="pcoded-content">
-            <div class="pcoded-inner-content">
-                <div class="main-body">
-                    <div class="page-wrapper">
-                        <div class="row">
-                            <!-- Statistik Deteksi Harian -->
-                            <div class="col-md-4">
-                                <div class="card daily-detection">
-                                    <div class="card-block">
-                                        <h6 class="mb-4">Deteksi Jatuh Harian</h6>
-                                        <div class="row d-flex align-items-center">
-                                            <div class="col-9">
-                                                <h3 class="f-w-300 d-flex align-items-center m-b-0">
-                                                    <i class="feather icon-alert-triangle text-c-red f-30 m-r-10"></i>{{ daily_falls }}
-                                                </h3>
-                                            </div>
-                                            <div class="col-3 text-right">
-                                                <p class="m-b-0">Kasus</p>
-                                            </div>
-                                        </div>
-                                        <div class="progress m-t-30" style="height: 7px;">
-                                            <div class="progress-bar progress-c-theme2" role="progressbar" style="width: {{ daily_falls_percentage }}%;" aria-valuenow="{{ daily_falls_percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- Statistik Deteksi Mingguan -->
-                            <div class="col-md-4">
-                                <div class="card weekly-detection">
-                                    <div class="card-block">
-                                        <h6 class="mb-4">Deteksi Jatuh Mingguan</h6>
-                                        <div class="row d-flex align-items-center">
-                                            <div class="col-9">
-                                                <h3 class="f-w-300 d-flex align-items-center m-b-0">
-                                                    <i class="feather icon-alert-triangle text-c-red f-30 m-r-10"></i>{{ weekly_falls }}
-                                                </h3>
-                                            </div>
-                                            <div class="col-3 text-right">
-                                                <p class="m-b-0">Kasus</p>
-                                            </div>
-                                        </div>
-                                        <div class="progress m-t-30" style="height: 7px;">
-                                            <div class="progress-bar progress-c-theme2" role="progressbar" style="width: {{ weekly_falls_percentage }}%;" aria-valuenow="{{ weekly_falls_percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- Statistik Deteksi Bulanan -->
-                            <div class="col-md-4">
-                                <div class="card monthly-detection">
-                                    <div class="card-block">
-                                        <h6 class="mb-4">Deteksi Jatuh Bulanan</h6>
-                                        <div class="row d-flex align-items-center">
-                                            <div class="col-9">
-                                                <h3 class="f-w-300 d-flex align-items-center m-b-0">
-                                                    <i class="feather icon-alert-triangle text-c-red f-30 m-r-10"></i>{{ monthly_falls }}
-                                                </h3>
-                                            </div>
-                                            <div class="col-3 text-right">
-                                                <p class="m-b-0">Kasus</p>
-                                            </div>
-                                        </div>
-                                        <div class="progress m-t-30" style="height: 7px;">
-                                            <div class="progress-bar progress-c-theme2" role="progressbar" style="width: {{ monthly_falls_percentage }}%;" aria-valuenow="{{ monthly_falls_percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- Grafik Statistik Deteksi -->
-                            <div class="col-xl-6 col-md-6">
-                                <div class="card detection-statistics">
-                                    <div class="card-header">
-                                        <h5>Statistik Pendeteksian Jatuh</h5>
-                                    </div>
-                                    <div class="card-block">
-                                        <div id="morris-line-smooth-chart-detection" style="height:300px"></div>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- Riwayat Deteksi -->
-                            <div class="col-xl-12 col-md-12 m-b-30">
-                                <ul class="nav nav-tabs" id="myTab" role="tablist">
-                                    <li class="nav-item">
-                                        <a class="nav-link active" id="today-tab" data-toggle="tab" href="#today" role="tab" aria-controls="today" aria-selected="true">Hari Ini</a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a class="nav-link" id="week-tab" data-toggle="tab" href="#week" role="tab" aria-controls="week" aria-selected="false">Minggu Ini</a>
-                                    </li>
-                                    <li class="nav-item">
-                                        <a class="nav-link" id="all-tab" data-toggle="tab" href="#all" role="tab" aria-controls="all" aria-selected="false">Semua</a>
-                                    </li>
-                                </ul>
-                                <div class="tab-content" id="myTabContent">
-                                    <div class="tab-pane fade show active" id="today" role="tabpanel" aria-labelledby="today-tab">
-                                        <table class="table table-hover">
-                                            <thead>
-                                                <tr>
-                                                    <th>#</th>
-                                                    <th>Waktu</th>
-                                                    <th>Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {% for log in daily_logs %}
-                                                <tr>
-                                                    <td>{{ loop.index }}</td>
-                                                    <td>{{ log.time }}</td>
-                                                    <td>{{ log.status }}</td>
-                                                </tr>
-                                                {% endfor %}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div class="tab-pane fade" id="week" role="tabpanel" aria-labelledby="week-tab">
-                                        <table class="table table-hover">
-                                            <thead>
-                                                <tr>
-                                                    <th>#</th>
-                                                    <th>Waktu</th>
-                                                    <th>Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {% for log in weekly_logs %}
-                                                <tr>
-                                                    <td>{{ loop.index }}</td>
-                                                    <td>{{ log.time }}</td>
-                                                    <td>{{ log.status }}</td>
-                                                </tr>
-                                                {% endfor %}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div class="tab-pane fade" id="all" role="tabpanel" aria-labelledby="all-tab">
-                                        <table class="table table-hover">
-                                            <thead>
-                                                <tr>
-                                                    <th>#</th>
-                                                    <th>Waktu</th>
-                                                    <th>Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {% for log in all_logs %}
-                                                <tr>
-                                                    <td>{{ loop.index }}</td>
-                                                    <td>{{ log.time }}</td>
-                                                    <td>{{ log.status }}</td>
-                                                </tr>
-                                                {% endfor %}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
+  <div class="pcoded-wrapper">
+    <div class="pcoded-content">
+      <div class="pcoded-inner-content">
+        <div class="main-body">
+          <div class="page-wrapper">
+            <div class="row">
+              <!-- Statistik Deteksi Harian -->
+              <div class="col-md-4">
+                <div class="card daily-detection">
+                  <div class="card-block">
+                    <h6 class="mb-4">Deteksi Jatuh Harian</h6>
+                    <div class="row d-flex align-items-center">
+                      <div class="col-9">
+                        <h3 class="f-w-300 d-flex align-items-center m-b-0">
+                          <i
+                            class="feather icon-alert-triangle text-c-red f-30 m-r-10"
+                          ></i
+                          >{{ daily_falls }}
+                        </h3>
+                      </div>
+                      <div class="col-3 text-right">
+                        <p class="m-b-0">Kasus</p>
+                      </div>
                     </div>
+                    <div class="progress m-t-30" style="height: 7px">
+                      <div
+                        class="progress-bar progress-c-theme2"
+                        role="progressbar"
+                        style="width: {{ daily_falls_percentage }}%;"
+                        aria-valuenow="{{ daily_falls_percentage }}"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                      >
+                    </div>
+                    </div>
+                  </div>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock content %}
+              </div>
+              <!-- Statistik Deteksi Mingguan -->
+              <div class="col-md-4">
+                <div class="card weekly-detection">
+                  <div class="card-block">
+                    <h6 class="mb-4">Deteksi Jatuh Mingguan</h6>
+                    <div class="row d-flex align-items-center">
+                      <div class="col-9">
+                        <h3 class="f-w-300 d-flex align-items-center m-b-0">
+                          <i
+                            class="feather icon-alert-triangle text-c-red f-30 m-r-10"
+                          ></i
+                          >{{ weekly_falls }}
+                        </h3>
+                      </div>
+                      <div class="col-3 text-right">
+                        <p class="m-b-0">Kasus</p>
+                      </div>
+                    </div>
+                    <div class="progress m-t-30" style="height: 7px">
+                      <div
+                        class="progress-bar progress-c-theme2"
+                        role="progressbar"
+                        style="width: {{ weekly_falls_percentage }}%;"
+                        aria-valuenow="{{ weekly_falls_percentage }}"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Statistik Deteksi Bulanan -->
+              <div class="col-md-4">
+                <div class="card monthly-detection">
+                  <div class="card-block">
+                    <h6 class="mb-4">Deteksi Jatuh Bulanan</h6>
+                    <div class="row d-flex align-items-center">
+                      <div class="col-9">
+                        <h3 class="f-w-300 d-flex align-items-center m-b-0">
+                          <i
+                            class="feather icon-alert-triangle text-c-red f-30 m-r-10"
+                          ></i
+                          >{{ monthly_falls }}
+                        </h3>
+                      </div>
+                      <div class="col-3 text-right">
+                        <p class="m-b-0">Kasus</p>
+                      </div>
+                    </div>
+                    <div class="progress m-t-30" style="height: 7px">
+                      <div
+                        class="progress-bar progress-c-theme2"
+                        role="progressbar"
+                        style="width: {{ monthly_falls_percentage }}%;"
+                        aria-valuenow="{{ monthly_falls_percentage }}"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Grafik Statistik Deteksi -->
+              <div class="col-xl-12 col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                      <h5>Grafik Statistik Pendeteksian Jatuh</h5>
+                    </div>
+                    <div class="card-block">
+                      <div id="combined-chart" style="height: 300px;"></div>
+                      <div class="chart-legend mt-3">
+                        <span class="legend-item">
+                            <span class="legend-color" style="background-color: #000000;"></span> Keterangan Grafik Sesuai Urutan:
+                          </span>
+                        <span class="legend-item">
+                          <span class="legend-color" style="background-color: #ff6f61;"></span> Harian -
+                        </span>
+                        <span class="legend-item">
+                          <span class="legend-color" style="background-color: #ffa500;"></span> Mingguan -
+                        </span>
+                        <span class="legend-item">
+                          <span class="legend-color" style="background-color: #1e90ff;"></span> Bulanan
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+              </div>
+              <!-- Riwayat Deteksi -->
+              <div class="col-xl-12 col-md-12 m-b-30">
+                <ul class="nav nav-tabs" id="myTab" role="tablist">
+                  <li class="nav-item">
+                    <a
+                      class="nav-link active"
+                      id="today-tab"
+                      data-toggle="tab"
+                      href="#today"
+                      role="tab"
+                      aria-controls="today"
+                      aria-selected="true"
+                      >Hari Ini</a
+                    >
+                  </li>
+                  <li class="nav-item">
+                    <a
+                      class="nav-link"
+                      id="week-tab"
+                      data-toggle="tab"
+                      href="#week"
+                      role="tab"
+                      aria-controls="week"
+                      aria-selected="false"
+                      >Minggu Ini</a
+                    >
+                  </li>
+                  <li class="nav-item">
+                    <a
+                      class="nav-link"
+                      id="all-tab"
+                      data-toggle="tab"
+                      href="#all"
+                      role="tab"
+                      aria-controls="all"
+                      aria-selected="false"
+                      >Semua</a
+                    >
+                  </li>
+                </ul>
+                <div class="tab-content" id="myTabContent">
+                  <div
+                    class="tab-pane fade show active"
+                    id="today"
+                    role="tabpanel"
+                    aria-labelledby="today-tab"
+                  >
+                    <table class="table table-hover">
+                      <thead>
+                        <tr>
+                          <th>No.</th>
+                          <th>Waktu</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for log in daily_logs %}
+                        <tr>
+                          <td>{{ loop.index }}</td>
+                          <td>{{ log.time }}</td>
+                          <td>{{ log.status }}</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                    <nav aria-label="Page navigation">
+                      <ul class="pagination justify-content-center">
+                        {% for page in range(1, daily_total_pages + 1) %}
+                        <li
+                          class="page-item {% if page == daily_page %}active{% endif %}"
+                        >
+                          <a
+                            class="page-link"
+                            href="{{ url_for('main.index', daily_page=page, weekly_page=weekly_page, all_page=all_page) }}"
+                            >{{ page }}</a
+                          >
+                        </li>
+                        {% endfor %}
+                      </ul>
+                    </nav>
+                  </div>
 
-{% block javascripts %}
-<script src="{{ url_for('static', filename='assets/plugins/chart-morris/js/raphael.min.js') }}"></script>
-<script src="{{ url_for('static', filename='assets/plugins/chart-morris/js/morris.min.js') }}"></script>
-{% endblock javascripts %}
+                  <div
+                    class="tab-pane fade"
+                    id="week"
+                    role="tabpanel"
+                    aria-labelledby="week-tab"
+                  >
+                    <table class="table table-hover">
+                      <thead>
+                        <tr>
+                          <th>No.</th>
+                          <th>Waktu</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for log in weekly_logs %}
+                        <tr>
+                          <td>{{ loop.index }}</td>
+                          <td>{{ log.time }}</td>
+                          <td>{{ log.status }}</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                    <nav aria-label="Page navigation">
+                      <ul class="pagination justify-content-center">
+                        {% for page in range(1, weekly_total_pages + 1) %}
+                        <li
+                          class="page-item {% if page == weekly_page %}active{% endif %}"
+                        >
+                          <a
+                            class="page-link"
+                            href="{{ url_for('main.index', weekly_page=page, daily_page=daily_page, all_page=all_page) }}"
+                            >{{ page }}</a
+                          >
+                        </li>
+                        {% endfor %}
+                      </ul>
+                    </nav>
+                  </div>
+
+                  <div
+                    class="tab-pane fade"
+                    id="all"
+                    role="tabpanel"
+                    aria-labelledby="all-tab"
+                  >
+                    <table class="table table-hover">
+                      <thead>
+                        <tr>
+                          <th>No.</th>
+                          <th>Waktu</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for log in all_logs %}
+                        <tr>
+                          <td>{{ loop.index }}</td>
+                          <td>{{ log.time }}</td>
+                          <td>{{ log.status }}</td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                    <nav aria-label="Page navigation">
+                      <ul class="pagination justify-content-center">
+                        {% for page in range(1, all_total_pages + 1) %}
+                        <li
+                          class="page-item {% if page == all_page %}active{% endif %}"
+                        >
+                          <a
+                            class="page-link"
+                            href="{{ url_for('main.index', all_page=page, daily_page=daily_page, weekly_page=weekly_page) }}"
+                            >{{ page }}</a
+                          >
+                        </li>
+                        {% endfor %}
+                      </ul>
+                    </nav>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endblock content %} {% block javascripts %}
+  <script src="{{ url_for('static', filename='assets/plugins/chart-morris/js/raphael.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='assets/plugins/chart-morris/js/morris.min.js') }}"></script>
+  <script>
+    new Morris.Bar({
+        element: 'combined-chart',
+        data: {{ combined_graph_data | default([]) | tojson }},
+        xkey: 'date',
+        ykeys: ['daily', 'weekly', 'monthly'],
+        // labels: ['Harian', 'Mingguan', 'Bulanan'],
+        barColors: ['#ff6f61', '#ffa500', '#1e90ff'],
+        hideHover: 'auto',
+        stacked: false,
+        xLabelAngle: 0,
+        xLabelMargin: 10,
+        resize: true 
+    });
+  </script>
+  {% endblock javascripts %}
+</div>

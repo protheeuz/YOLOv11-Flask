@@ -174,13 +174,10 @@ def register():
     else:
         return render_template('auth/register.html') 
 
-
-
 @auth_bp.route('/register_face', methods=['POST'])
 def register_face():
     face_image = request.files['face_image']
     user_id = request.form['user_id']
-
     if not user_id:
         logging.error("User ID is missing in register_face.")
         return jsonify({"status": "gagal", "pesan": "User ID tidak ditemukan"}), 400
@@ -206,8 +203,6 @@ def register_face():
         logging.exception("Terjadi kesalahan saat memproses wajah")
         return jsonify({"status": "gagal", "pesan": "Wajah tidak ditemukan"}), 400
 
-
-
 @auth_bp.route('/login', methods=['POST', 'GET'])
 def login():
     if request.method == 'POST':
@@ -229,7 +224,7 @@ def login():
             password_correct = bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8'))
 
             if password_correct:
-                user = User.get(user_data[0])  # Pastikan objek user valid
+                user = User.get(user_data[0])
                 if not user:
                     logging.error(f"User dengan ID {user_data[0]} tidak ditemukan setelah login.")
                     return jsonify({"status": "gagal", "message": "User tidak ditemukan"}), 404

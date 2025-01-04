@@ -13,13 +13,16 @@
                             <!-- Unggah Video untuk Deteksi -->
                             <div class="col-md-6">
                                 <h4 class="mb-4">Unggah Video untuk Deteksi</h4>
-                                <form action="{{ url_for('main.detect_upload') }}" method="POST" enctype="multipart/form-data">
+                                <form id="video-detection-form" action="{{ url_for('main.detect_upload') }}" method="POST" enctype="multipart/form-data">
                                     <div class="form-group">
                                         <label for="video">Pilih Video</label>
                                         <input type="file" name="video" id="video" class="form-control" accept="video/*" required>
                                     </div>
                                     <button type="submit" class="btn btn-primary">Proses Video</button>
                                 </form>
+                                <div id="processing-message" class="mt-3 text-info" style="display: none;">
+                                    <strong>Sedang memproses deteksi, tunggu sebentar...</strong>
+                                </div>
                             </div>
 
                             <!-- Hubungkan ke RTSP untuk Deteksi Real-time -->
@@ -85,3 +88,12 @@
     </div>
 </div>
 {% endblock content %}
+
+{% block scripts %}
+<script>
+    document.getElementById('video-detection-form').addEventListener('submit', function(event) {
+        // Menampilkan pesan "Sedang memproses"
+        document.getElementById('processing-message').style.display = 'block';
+    });
+</script>
+{% endblock scripts %}

@@ -26,7 +26,7 @@ load_dotenv()
 app = Flask(__name__)
 app.config.from_object(Config)
 app.secret_key = '5f957e6105f189f9974ae631b351b321'
-CORS(app)
+CORS(app, resources={r"/static/uploads/*": {"origins": "*"}})
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -35,7 +35,10 @@ login_manager.login_view = 'auth.login'
 # Tambahkan konfigurasi 'UPLOAD_FOLDER'
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
 app.config['DETECTION_IMAGES_FOLDER'] = os.path.join(app.root_path, 'static/uploads/detections')
+app.config['PUBLIC_URL'] = 'https://hardy-tolerant-kodiak.ngrok-free.app'
 
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['DETECTION_IMAGES_FOLDER'], exist_ok=True)
 
 @login_manager.user_loader
 def load_user(user_id):

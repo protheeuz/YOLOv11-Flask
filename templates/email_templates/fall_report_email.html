@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Laporan Deteksi Jatuh</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 50px auto;
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background-color: 007bff;
+            text-align: center;
+            padding: 30px 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .header img {
+            width: 300px;
+            height: auto;
+            display: block;
+            margin: 0 auto 15px 42%; 
+        }
+        .header h2 {
+            color: #ffffff; 
+            margin: 0;
+            font-size: 28px;
+            background-color: #469bf6;
+        }
+        .content {
+            padding: 30px;
+            text-align: left;
+        }
+        .content p {
+            color: #333333;
+            font-size: 16px;
+            line-height: 1.6;
+            margin: 15px 0;
+        }
+        .image {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .image img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+        }
+        .footer {
+            padding: 20px;
+            text-align: center;
+            background-color: #469bf6;
+            color: #ffffff;
+            font-size: 14px;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://unsada.ac.id/wp-content/uploads/elementor/thumbs/logo-unsada-putih-1-pqrmvy61d5dwvtnszeqzly09w9mqn4yn1g52heu86s.png" alt="Logo Unsada">
+            <h2>Laporan Deteksi Jatuh</h2>
+        </div>
+        <div class="content">
+            <p>Halo, {{ name }}</p>
+            <p>Kami mendeteksi adanya <strong>jatuh</strong> dengan confidence <strong>{{ confidence }}%</strong> pada sesi pendeteksian terakhir kamu nih. Berikut adalah detail deteksinya:</p>
+            <ul>
+                <li><strong>Waktu:</strong> {{ time }}</li>
+                <li><strong>Confidence:</strong> {{ confidence }}%</li>
+            </ul>
+            <div class="image">
+                <p><strong>Gambar Deteksi:</strong></p>
+                <img src="{{ image_url }}" alt="Deteksi Jatuh">
+            </div>
+            <p>Email ini dikirimkan sebagai bagian dari laporan otomatis sistem pendeteksian. Jika kamu memiliki pertanyaan, silakan hubungi kami.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2024 Fall Detection Platform - Universitas Darma Persada</p>
+            <p>All rights reserved</p>
+        </div>
+    </div>
+</body>
+</html>

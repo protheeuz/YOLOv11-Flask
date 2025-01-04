@@ -1,61 +1,60 @@
-{% extends "layouts/base.html" %}
-
-{% block title %}Riwayat Pendeteksian{% endblock %}
-
-{% block content %}
+{% extends "layouts/base.html" %} {% block title %}Riwayat Pendeteksian{%
+endblock %} {% block content %}
 <div class="pcoded-main-container">
-    <div class="pcoded-wrapper">
-        <div class="pcoded-content">
-            <div class="pcoded-inner-content">
-                <div class="main-body">
-                    <div class="page-wrapper">
-                        <div class="row">
-                            <div class="col-md-12">
-                                <h4 class="mb-4">Riwayat Deteksi Jatuh</h4>
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>No.</th>
-                                            <th>Waktu</th>
-                                            <th>Confidence</th>
-                                            <th>Status</th>
-                                            <th>Gambar</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for detection in detection_history %}
-                                        <tr>
-                                            <td>{{ loop.index }}</td>
-                                            <td>{{ detection.time }}</td>
-                                            <td>{{ detection.confidence }}%</td>
-                                            <td>{{ detection.label }}</td>
-                                            <td>
-                                                {% if detection.image_path %}
-                                                    <img src="{{ url_for('static', filename=detection.image_path) }}" 
-                                                         alt="Detection Image" 
-                                                         style="max-width: 100px; height: auto;"
-                                                         onclick="window.open(this.src)"
-                                                         class="cursor-pointer">
-                                                {% else %}
-                                                    <span>-</span>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+  <div class="pcoded-wrapper">
+    <div class="pcoded-content">
+      <div class="pcoded-inner-content">
+        <div class="main-body">
+          <div class="page-wrapper">
+            <div class="row">
+              <div class="col-md-12">
+                <h4 class="mb-4">Riwayat Deteksi Jatuh</h4>
+                <table class="table table-hover">
+                  <thead>
+                    <tr>
+                      <th>No.</th>
+                      <th>Waktu</th>
+                      <th>Confidence</th>
+                      <th>Status</th>
+                      <th>Gambar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for detection in detection_history %}
+                    <tr>
+                      <td>{{ loop.index }}</td>
+                      <td>{{ detection.time }}</td>
+                      <td>{{ detection.confidence }}%</td>
+                      <td>{{ detection.label }}</td>
+                      <td>
+                        {% if detection.image_path %}
+                        <img
+                          src="{{ url_for('static', filename=detection.image_path) }}"
+                          alt="Detection Image"
+                          style="max-width: 100px; height: auto"
+                          onclick="window.open(this.src)"
+                          class="cursor-pointer"
+                        />
+                        {% else %}
+                        <span>-</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
             </div>
+          </div>
         </div>
+      </div>
     </div>
+  </div>
 </div>
 
 <style>
-.cursor-pointer {
+  .cursor-pointer {
     cursor: pointer;
-}
+  }
 </style>
 {% endblock content %}
