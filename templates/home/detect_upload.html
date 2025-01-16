@@ -74,7 +74,8 @@
                                 <h5>Hasil Video yang Diproses</h5>
                                 <div class="video-frame" style="position: relative; overflow: hidden; border: 1px solid #000;">
                                     <video id="processed-video" controls autoplay style="width: 100%;">
-                                        <source src="{{ url_for('static', filename=output_path) }}" type="video/mp4">
+                                        <source src="{{ output_path }}" type="video/mp4">
+                                        <!-- <source src="{{ url_for('static', filename=output_path) }}" type="video/mp4"> -->
                                         Browser kamu gak mendukung pemutar video.
                                     </video>
                                 </div>

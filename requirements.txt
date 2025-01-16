@@ -73,7 +73,6 @@ starkbank-ecdsa==2.2.0
 tensorboard==2.16.2
 tensorboard-data-server==0.7.2
 tensorflow==2.16.2
-# tensorflow-intel==2.18.0
 termcolor==2.4.0
 tf_keras==2.16.0
 threadpoolctl==3.5.0
@@ -87,3 +86,4 @@ wrapt==1.16.0
 zipp==3.19.2
 zope.interface==6.4.post2
 ultralytics==8.3.55
+opencv-python-headless

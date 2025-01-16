@@ -6,7 +6,7 @@ from flask import Blueprint, Response, flash, render_template, redirect, url_for
 from flask_login import login_required, current_user, login_user
 from database import get_db
 from models import User
-from detection import detect_and_label, generate_frames, process_video
+from detection import detect_and_label, generate_frames, process_video, model, CONFIDENCE_THRESHOLD
 from werkzeug.utils import secure_filename
 from datetime import date, timedelta
 from sendgrid import SendGridAPIClient
@@ -141,7 +141,6 @@ def generate_date_range(start_date, end_date):
     while current_date <= end_date:
         yield current_date
         current_date += timedelta(days=1)
-
     
 @main_bp.route('/profile')
 @login_required
@@ -261,22 +260,98 @@ def list_detections():
 @login_required
 def stream(video_source):
     """
-    Streaming video dengan deteksi bounding box.
+    Streaming video dengan deteksi bounding box, mirip detect_upload.
     """
+    user_id = current_user.id
+
     def generate():
         cap = cv2.VideoCapture(video_source)
+        if not cap.isOpened():
+            logging.error(f"Tidak dapat membuka video atau URL RTSP: {video_source}")
+            return
+
+        frame_count = 0
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
 
-            frame = detect_and_label(frame, current_user.id)
+            frame_count += 1
+            try:
+                # Deteksi dan label pada frame
+                results = model(frame)
+                for result in results:
+                    if hasattr(result, "boxes"):
+                        for box in result.boxes:
+                            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+                            confidence = box.conf[0].item()
+                            class_id = int(box.cls[0].item())
 
-            _, buffer = cv2.imencode('.jpg', frame)
-            frame_bytes = buffer.tobytes()
+                            if confidence < CONFIDENCE_THRESHOLD:
+                                continue
 
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+                            label = LABEL_MAP.get(class_id, f"Unknown-{class_id}")
+
+                            # Simpan ke database jika deteksi adalah "jatuh"
+                            if label.lower() == "jatuh":
+                                timestamp = int(time.time())
+                                filename = f"fall_{user_id}_{timestamp}_{frame_count}.jpg"
+
+                                # Konfigurasi path untuk menyimpan frame
+                                abs_image_path = os.path.join(
+                                    current_app.config['DETECTION_IMAGES_FOLDER'], filename
+                                )
+                                rel_image_path = f"uploads/detections/{filename}"
+
+                                # Simpan gambar dengan bounding box
+                                cropped_image = frame[y1:y2, x1:x2]
+                                os.makedirs(os.path.dirname(abs_image_path), exist_ok=True)
+                                cv2.imwrite(abs_image_path, cropped_image)
+
+                                # Log setelah menyimpan frame
+                                logging.info(f"Frame saved to: {abs_image_path}")
+
+                                # Simpan deteksi ke database
+                                save_detection_to_db(user_id, label, confidence, rel_image_path)
+
+                                # Kirim laporan fall report
+                                send_fall_report(
+                                    email=current_user.email,
+                                    phone=current_user.phone,
+                                    fall_data={
+                                        'time': timestamp,
+                                        'confidence': confidence,
+                                        'image_path': rel_image_path,
+                                    },
+                                    name=current_user.name,
+                                )
+                                logging.info(f"Fall report sent for user {user_id}")
+
+                            # Gambar bounding box pada frame
+                            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                            cv2.putText(
+                                frame,
+                                f"{label} ({confidence:.2f})",
+                                (x1, y1 - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.5,
+                                (0, 255, 0),
+                                2,
+                            )
+
+                # Encode frame ke JPEG
+                _, buffer = cv2.imencode('.jpg', frame)
+                frame_bytes = buffer.tobytes()
+
+                yield (
+                    b'--frame\r\n'
+                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n'
+                )
+
+            except Exception as e:
+                logging.error(f"Error during detection in streaming: {str(e)}")
+                continue
+
         cap.release()
 
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
@@ -285,52 +360,94 @@ def stream(video_source):
 @login_required
 def detect_upload():
     if request.method == 'POST':
+        # Validasi file video
         video_file = request.files.get('video')
         if not video_file:
             flash('Harap unggah file video.', 'danger')
             return redirect(url_for('main.detect_upload'))
 
+        # Simpan file video input
         filename = secure_filename(video_file.filename)
         input_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
         video_file.save(input_path)
+        logging.info(f"Video input disimpan di: {input_path}")
 
-        # Output path relatif terhadap folder static
+        # Konfigurasi path untuk output
         output_filename = f"output_{filename}"
-        output_path = os.path.join(current_app.config['DETECTION_IMAGES_FOLDER'], output_filename)
+        if not output_filename.endswith('.mp4'):
+            output_filename = output_filename + '.mp4'
+        
+        # Gunakan normalized path untuk file system operations
+        output_path = os.path.normpath(os.path.join(
+            current_app.config['DETECTION_IMAGES_FOLDER'], 
+            output_filename
+        ))
+        os.makedirs(current_app.config['DETECTION_IMAGES_FOLDER'], exist_ok=True)
+        
+        try:
+            # Proses video dan dapatkan frame untuk email
+            email_frame_path = process_video(input_path, output_path, current_user.id, save_for_email=True)
+            logging.info(f"Video berhasil diproses. Frame email disimpan di: {email_frame_path}")
+            
+            # Ambil deteksi dengan confidence tertinggi
+            connection = get_db()
+            cursor = connection.cursor()
+            cursor.execute("""
+                SELECT time, confidence, image_path
+                FROM detections
+                WHERE user_id = %s AND label = 'Jatuh'
+                ORDER BY confidence DESC
+                LIMIT 1
+            """, (current_user.id,))
+            highest_confidence_fall = cursor.fetchone()
+            cursor.close()
 
-        # Proses video
-        email_frame_path = process_video(input_path, output_path, current_user.id, save_for_email=True)
+            # Kirim notifikasi jika terdeteksi jatuh
+            if highest_confidence_fall and email_frame_path:
+                highest_fall_data = {
+                    'time': highest_confidence_fall[0],
+                    'confidence': highest_confidence_fall[1],
+                    'image_path': email_frame_path
+                }
+                send_fall_report(
+                    email=current_user.email,
+                    phone=current_user.phone, 
+                    fall_data=highest_fall_data,
+                    name=current_user.name
+                )
+                logging.info(f"Laporan jatuh dikirim ke {current_user.email}")
 
-        # Ambil deteksi dengan confidence tertinggi dari database
-        connection = get_db()
-        cursor = connection.cursor()
-        cursor.execute("""
-            SELECT time, confidence, image_path
-            FROM detections
-            WHERE user_id = %s AND label = 'Jatuh'
-            ORDER BY confidence DESC
-            LIMIT 1
-        """, (current_user.id,))
-        highest_confidence_fall = cursor.fetchone()
-        cursor.close()
+            # Generate URL untuk video output menggunakan route khusus
+            video_url = url_for('main.serve_detection_video', filename=output_filename)
+            logging.info(f"URL video output: {video_url}")
 
-        # Kirim laporan jika ada deteksi 'Jatuh'
-        if highest_confidence_fall and email_frame_path:
-            highest_fall_data = {
-                'time': highest_confidence_fall[0],
-                'confidence': highest_confidence_fall[1],
-                'image_path': email_frame_path
-            }
-            send_fall_report(
-                email=current_user.email,
-                phone=current_user.phone, 
-                fall_data=highest_fall_data,
-                name=current_user.name
-            )
+            flash('Video berhasil diproses. Silakan unduh hasilnya.', 'success')
+            return render_template('home/detect_upload.html', 
+                                output_path=video_url)
 
-        flash('Video berhasil diproses. Silakan unduh hasilnya.', 'success')
-        return render_template('home/detect_upload.html', output_path=f'uploads/{output_filename}')
+        except Exception as e:
+            logging.error(f"Error saat memproses video: {str(e)}")
+            flash('Terjadi kesalahan saat memproses video.', 'danger')
+            return redirect(url_for('main.detect_upload'))
+
+    # GET request
     return render_template('home/detect_upload.html')
+
+@main_bp.route('/detections/<filename>')
+@login_required
+def serve_detection_video(filename):
+    """Serve processed video files"""
+    try:
+        detection_path = current_app.config['DETECTION_IMAGES_FOLDER']
+        return send_from_directory(
+            detection_path,
+            filename,
+            mimetype='video/mp4',
+            as_attachment=False
+        )
+    except Exception as e:
+        logging.error(f"Error serving video: {str(e)}")
+        return "Video not found", 404
 
 @main_bp.route('/detect/realtime_rtsp', methods=['POST'])
 @login_required

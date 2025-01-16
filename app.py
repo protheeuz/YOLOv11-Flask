@@ -33,12 +33,14 @@ login_manager.init_app(app)
 login_manager.login_view = 'auth.login' 
 
 # Tambahkan konfigurasi 'UPLOAD_FOLDER'
-app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/uploads')
-app.config['DETECTION_IMAGES_FOLDER'] = os.path.join(app.root_path, 'static/uploads/detections')
+app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
+app.config['DETECTION_IMAGES_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads', 'detections')
 app.config['PUBLIC_URL'] = 'https://hardy-tolerant-kodiak.ngrok-free.app'
+app.config['ALLOWED_EXTENSIONS'] = {'mp4', 'avi', 'mov'}
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['DETECTION_IMAGES_FOLDER'], exist_ok=True)
+
 
 @login_manager.user_loader
 def load_user(user_id):
