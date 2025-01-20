@@ -408,17 +408,3 @@ def recognize_face(face_encoding):
         if similarity > 0.9:  
             return user_id
     return None
-    
-# @auth_bp.route('/send_session_token', methods=['POST'])
-# @login_required
-# def send_session_token():
-#     data = request.get_json()
-#     esp32_ip = data.get('esp32_ip')
-#     session_token = session.get('session_token')
-
-#     response = requests.post(f'http://{esp32_ip}/set_session_token', json={'session_token': session_token})
-
-#     if response.status_code == 200:
-#         return jsonify({"status": "sukses"})
-#     else:
-#         return jsonify({"status": "gagal"}), 500

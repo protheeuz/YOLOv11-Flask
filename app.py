@@ -1,21 +1,23 @@
 import os
+import threading
+from time import sleep
 import warnings
 from wsgiref import headers
 from dotenv import load_dotenv
 from flask_cors import CORS
 
-# Menonaktifkan operasi khusus oneDNN untuk TensorFlow
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Mengurangi log peringatan TensorFlow
-# Mengabaikan peringatan DeprecationWarning
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+# # Menonaktifkan operasi khusus oneDNN untuk TensorFlow
+# os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Mengurangi log peringatan TensorFlow
+# # Mengabaikan peringatan DeprecationWarning
+# warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import requests
-import tensorflow as tf
 from flask import Flask, current_app, render_template, redirect, request, session, url_for
 from flask_login import LoginManager, current_user, login_required
 from config import Config
 from database import close_db, get_db
+from detection import cleanup_handlers
 from views.auth import auth_bp
 from views.main import main_bp
 from models import User
@@ -41,6 +43,16 @@ app.config['ALLOWED_EXTENSIONS'] = {'mp4', 'avi', 'mov'}
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['DETECTION_IMAGES_FOLDER'], exist_ok=True)
 
+def setup_cleanup_task(app):
+    def cleanup_task():
+        with app.app_context():
+            while True:
+                cleanup_handlers()
+                sleep(30) 
+                
+    cleanup_thread = threading.Thread(target=cleanup_task)
+    cleanup_thread.daemon = True
+    cleanup_thread.start()
 
 @login_manager.user_loader
 def load_user(user_id):

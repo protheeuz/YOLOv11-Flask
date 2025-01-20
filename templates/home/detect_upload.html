@@ -35,12 +35,12 @@
                                     </div>
                                     <button type="submit" class="btn btn-success">Mulai Deteksi</button>
                                 </form>
-                                
+
                                 <!-- Panduan untuk pengguna -->
                                 <div class="mt-4">
                                     <h6>Panduan untuk kamu nih:</h6>
                                     <ul>
-                                        <li>Pastiin kamera CCTV kamu mendukung protokol <strong>RTSP</strong>.</li>
+                                        <li>Pastikan kamera CCTV mendukung protokol <strong>RTSP</strong>.</li>
                                         <li>Masukkan URL RTSP dalam format berikut:
                                             <ul>
                                                 <li><code>rtsp://<IP_ADDRESS>:<PORT>/<STREAM_PATH></code></li>
@@ -52,7 +52,7 @@
                                                 <li><code>rtsp://admin:password@192.168.1.100:554/h264/main/av_stream</code></li>
                                             </ul>
                                         </li>
-                                        <li>Jika kamu gak yakin sama URL RTSP, periksa manual kamera atau gunakan aplikasi seperti VLC untuk memverifikasi URL.</li>
+                                        <li>Gunakan aplikasi seperti VLC untuk memverifikasi URL jika tidak yakin.</li>
                                     </ul>
                                 </div>
 
@@ -62,22 +62,28 @@
                                     <div class="video-frame" style="position: relative; overflow: hidden; border: 1px solid #000;">
                                         <img id="rtsp-stream" src="{{ url_for('main.stream', video_source=rtsp_url) }}" alt="RTSP Stream" style="width: 100%;">
                                     </div>
+                                    <div class="mt-2">
+                                        <button id="pause-stream" class="btn btn-warning btn-sm">Pause</button>
+                                        <button id="resume-stream" class="btn btn-success btn-sm">Resume</button>
+                                    </div>
                                 </div>
                                 {% endif %}
                             </div>
                         </div>
-
                         <!-- Hasil Video yang Diproses -->
                         {% if output_path %}
                         <div class="row mt-4">
                             <div class="col-md-12">
                                 <h5>Hasil Video yang Diproses</h5>
                                 <div class="video-frame" style="position: relative; overflow: hidden; border: 1px solid #000;">
-                                    <video id="processed-video" controls autoplay style="width: 100%;">
+                                    <video id="processed-video" controls style="width: 100%;" preload="metadata">
+                                        <source src="{{ output_path|replace('.mp4', '.avi') }}" type="video/x-msvideo">
                                         <source src="{{ output_path }}" type="video/mp4">
-                                        <!-- <source src="{{ url_for('static', filename=output_path) }}" type="video/mp4"> -->
-                                        Browser kamu gak mendukung pemutar video.
+                                        Browser kamu tidak mendukung pemutar video.
                                     </video>
+                                    <div class="mt-2">
+                                        <a href="{{ output_path|replace('.mp4', '.avi') }}" download class="btn btn-primary btn-sm">Download Video</a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -92,9 +98,32 @@
 
 {% block scripts %}
 <script>
-    document.getElementById('video-detection-form').addEventListener('submit', function(event) {
-        // Menampilkan pesan "Sedang memproses"
-        document.getElementById('processing-message').style.display = 'block';
+    document.addEventListener('DOMContentLoaded', function () {
+        // Kontrol pause dan resume streaming RTSP
+        const streamImg = document.getElementById('rtsp-stream');
+        const pauseBtn = document.getElementById('pause-stream');
+        const resumeBtn = document.getElementById('resume-stream');
+
+        let isPaused = false;
+
+        pauseBtn.addEventListener('click', function () {
+            if (!isPaused) {
+                streamImg.src = ""; // Hentikan streaming
+                isPaused = true;
+            }
+        });
+
+        resumeBtn.addEventListener('click', function () {
+            if (isPaused) {
+                streamImg.src = "{{ url_for('main.stream', video_source=rtsp_url) }}"; // Lanjutkan streaming
+                isPaused = false;
+            }
+        });
+
+        // Menampilkan pesan saat video sedang diproses
+        document.getElementById('video-detection-form').addEventListener('submit', function(event) {
+            document.getElementById('processing-message').style.display = 'block';
+        });
     });
 </script>
 {% endblock scripts %}

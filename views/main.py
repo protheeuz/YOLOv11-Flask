@@ -1,18 +1,21 @@
 import os
+import time
 import cv2
 import logging
 import requests
-from flask import Blueprint, Response, flash, render_template, redirect, url_for, request, jsonify, current_app
+from flask import Blueprint, Response, flash, g, render_template, redirect, send_from_directory, url_for, request, jsonify, current_app
 from flask_login import login_required, current_user, login_user
 from database import get_db
 from models import User
-from detection import detect_and_label, generate_frames, process_video, model, CONFIDENCE_THRESHOLD
+from concurrent.futures import ThreadPoolExecutor
+from detection import LABEL_MAP, RTSPStreamHandler, detect_and_label, generate_frames, get_stream_handler, process_video, model, CONFIDENCE_THRESHOLD, save_detection_to_db
 from werkzeug.utils import secure_filename
 from datetime import date, timedelta
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
 main_bp = Blueprint('main', __name__)
+
 
 @main_bp.route('/')
 @login_required
@@ -54,7 +57,8 @@ def index():
         GROUP BY DATE(time) 
         ORDER BY date ASC
     """, (user_id,))
-    raw_data = {row[0]: {'daily': row[1], 'weekly': row[2], 'monthly': row[3]} for row in cursor.fetchall()}
+    raw_data = {row[0]: {'daily': row[1], 'weekly': row[2],
+                         'monthly': row[3]} for row in cursor.fetchall()}
 
     # Isi data yang kosong dengan nilai nol
     start_date = min(raw_data.keys(), default=date.today())
@@ -87,7 +91,8 @@ def index():
         ORDER BY time DESC
         LIMIT %s OFFSET %s
     """, (user_id, limit, daily_offset))
-    daily_logs = [{'time': row[0], 'status': row[1]} for row in cursor.fetchall()]
+    daily_logs = [{'time': row[0], 'status': row[1]}
+                  for row in cursor.fetchall()]
 
     # Log minggu ini
     cursor.execute("""
@@ -97,7 +102,8 @@ def index():
         ORDER BY time DESC
         LIMIT %s OFFSET %s
     """, (user_id, limit, weekly_offset))
-    weekly_logs = [{'time': row[0], 'status': row[1]} for row in cursor.fetchall()]
+    weekly_logs = [{'time': row[0], 'status': row[1]}
+                   for row in cursor.fetchall()]
 
     # Semua log
     cursor.execute("""
@@ -107,14 +113,18 @@ def index():
         ORDER BY time DESC
         LIMIT %s OFFSET %s
     """, (user_id, limit, all_offset))
-    all_logs = [{'time': row[0], 'status': row[1]} for row in cursor.fetchall()]
+    all_logs = [{'time': row[0], 'status': row[1]}
+                for row in cursor.fetchall()]
 
     cursor.close()
 
     # Kalkulasi total halaman
-    daily_total_pages = (daily_count // limit) + (1 if daily_count % limit > 0 else 0)
-    weekly_total_pages = (weekly_count // limit) + (1 if weekly_count % limit > 0 else 0)
-    all_total_pages = (len(all_logs) // limit) + (1 if len(all_logs) % limit > 0 else 0)
+    daily_total_pages = (daily_count // limit) + \
+        (1 if daily_count % limit > 0 else 0)
+    weekly_total_pages = (weekly_count // limit) + \
+        (1 if weekly_count % limit > 0 else 0)
+    all_total_pages = (len(all_logs) // limit) + \
+        (1 if len(all_logs) % limit > 0 else 0)
 
     return render_template(
         'home/index.html',
@@ -130,22 +140,27 @@ def index():
         daily_total_pages=daily_total_pages,
         weekly_total_pages=weekly_total_pages,
         all_total_pages=all_total_pages,
-        daily_falls_percentage=(daily_count / max(weekly_count, 1)) * 100 if weekly_count else 0,
-        weekly_falls_percentage=(weekly_count / max(monthly_count, 1)) * 100 if monthly_count else 0,
+        daily_falls_percentage=(
+            daily_count / max(weekly_count, 1)) * 100 if weekly_count else 0,
+        weekly_falls_percentage=(
+            weekly_count / max(monthly_count, 1)) * 100 if monthly_count else 0,
         monthly_falls_percentage=100,
-        combined_graph_data=combined_graph_data 
+        combined_graph_data=combined_graph_data
     )
-    
+
+
 def generate_date_range(start_date, end_date):
     current_date = start_date
     while current_date <= end_date:
         yield current_date
         current_date += timedelta(days=1)
-    
+
+
 @main_bp.route('/profile')
 @login_required
 def profile():
     return render_template('home/profile.html')
+
 
 @main_bp.route('/update_profile', methods=['POST'])
 @login_required
@@ -173,6 +188,7 @@ def update_profile():
     flash('Profil berhasil diperbarui.', 'success')
     return redirect(url_for('main.profile'))
 
+
 @main_bp.route('/update_profile_image', methods=['POST'])
 @login_required
 def update_profile_image():
@@ -197,11 +213,13 @@ def update_profile_image():
         flash('Foto profil berhasil diperbarui.', 'success')
     return redirect(url_for('main.profile'))
 
+
 def save_profile_image(image_file):
     filename = secure_filename(image_file.filename)
     filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
     image_file.save(filepath)
     return 'uploads/' + filename
+
 
 @main_bp.route('/riwayat')
 @login_required
@@ -216,7 +234,7 @@ def riwayat():
         WHERE user_id = %s
         ORDER BY time DESC
     """, (user_id,))
-    
+
     detection_history = [
         {
             'time': row[0],
@@ -229,6 +247,7 @@ def riwayat():
     cursor.close()
 
     return render_template('home/riwayat.html', detection_history=detection_history)
+
 
 @main_bp.route('/list-detections')
 @login_required
@@ -243,7 +262,7 @@ def list_detections():
         WHERE user_id = %s AND label = 'fall'
         ORDER BY time DESC
     """, (user_id,))
-    
+
     detections = [
         {
             'confidence': row[0],
@@ -256,105 +275,41 @@ def list_detections():
 
     return render_template('home/list_detections.html', detections=detections)
 
+
 @main_bp.route('/stream/<path:video_source>')
 @login_required
 def stream(video_source):
     """
-    Streaming video dengan deteksi bounding box, mirip detect_upload.
+    Streaming video dengan deteksi bounding box menggunakan threading.
     """
-    user_id = current_user.id
-
     def generate():
-        cap = cv2.VideoCapture(video_source)
-        if not cap.isOpened():
-            logging.error(f"Tidak dapat membuka video atau URL RTSP: {video_source}")
-            return
+        handler = get_stream_handler(video_source, model)
 
-        frame_count = 0
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            frame_count += 1
-            try:
-                # Deteksi dan label pada frame
-                results = model(frame)
-                for result in results:
-                    if hasattr(result, "boxes"):
-                        for box in result.boxes:
-                            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-                            confidence = box.conf[0].item()
-                            class_id = int(box.cls[0].item())
-
-                            if confidence < CONFIDENCE_THRESHOLD:
-                                continue
-
-                            label = LABEL_MAP.get(class_id, f"Unknown-{class_id}")
-
-                            # Simpan ke database jika deteksi adalah "jatuh"
-                            if label.lower() == "jatuh":
-                                timestamp = int(time.time())
-                                filename = f"fall_{user_id}_{timestamp}_{frame_count}.jpg"
-
-                                # Konfigurasi path untuk menyimpan frame
-                                abs_image_path = os.path.join(
-                                    current_app.config['DETECTION_IMAGES_FOLDER'], filename
-                                )
-                                rel_image_path = f"uploads/detections/{filename}"
-
-                                # Simpan gambar dengan bounding box
-                                cropped_image = frame[y1:y2, x1:x2]
-                                os.makedirs(os.path.dirname(abs_image_path), exist_ok=True)
-                                cv2.imwrite(abs_image_path, cropped_image)
-
-                                # Log setelah menyimpan frame
-                                logging.info(f"Frame saved to: {abs_image_path}")
-
-                                # Simpan deteksi ke database
-                                save_detection_to_db(user_id, label, confidence, rel_image_path)
-
-                                # Kirim laporan fall report
-                                send_fall_report(
-                                    email=current_user.email,
-                                    phone=current_user.phone,
-                                    fall_data={
-                                        'time': timestamp,
-                                        'confidence': confidence,
-                                        'image_path': rel_image_path,
-                                    },
-                                    name=current_user.name,
-                                )
-                                logging.info(f"Fall report sent for user {user_id}")
-
-                            # Gambar bounding box pada frame
-                            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                            cv2.putText(
-                                frame,
-                                f"{label} ({confidence:.2f})",
-                                (x1, y1 - 10),
-                                cv2.FONT_HERSHEY_SIMPLEX,
-                                0.5,
-                                (0, 255, 0),
-                                2,
-                            )
-
-                # Encode frame ke JPEG
-                _, buffer = cv2.imencode('.jpg', frame)
-                frame_bytes = buffer.tobytes()
-
-                yield (
-                    b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n'
-                )
-
-            except Exception as e:
-                logging.error(f"Error during detection in streaming: {str(e)}")
+        while True:
+            frame = handler.get_frame()
+            if frame is None:
                 continue
 
-        cap.release()
+            # Tambahkan log frame shape untuk debugging
+            logging.info(f"Generated frame with shape: {frame.shape}")
 
+            _, buffer = cv2.imencode('.jpg', frame)
+            frame_bytes = buffer.tobytes()
+
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+            time.sleep(0.03)  # Kurangi latensi sesuai kebutuhan
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+# Fungsi pembantu utk memastikan path folder ada
+def ensure_folder_exists(folder_path):
+    try:
+        os.makedirs(folder_path, exist_ok=True)
+        logging.info(f"Folder ensured: {folder_path}")
+    except Exception as e:
+        logging.error(f"Failed to create folder {folder_path}: {e}")
+        raise
 
 @main_bp.route('/detect/upload', methods=['GET', 'POST'])
 @login_required
@@ -369,26 +324,31 @@ def detect_upload():
         # Simpan file video input
         filename = secure_filename(video_file.filename)
         input_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+        ensure_folder_exists(current_app.config['UPLOAD_FOLDER'])
         video_file.save(input_path)
         logging.info(f"Video input disimpan di: {input_path}")
 
         # Konfigurasi path untuk output
         output_filename = f"output_{filename}"
-        if not output_filename.endswith('.mp4'):
-            output_filename = output_filename + '.mp4'
-        
-        # Gunakan normalized path untuk file system operations
-        output_path = os.path.normpath(os.path.join(
-            current_app.config['DETECTION_IMAGES_FOLDER'], 
-            output_filename
-        ))
-        os.makedirs(current_app.config['DETECTION_IMAGES_FOLDER'], exist_ok=True)
-        
+        if not output_filename.lower().endswith(('.avi', '.mp4')):
+            output_filename += '.avi'
+
+        output_path = os.path.join(
+            current_app.config['DETECTION_IMAGES_FOLDER'], output_filename
+        )
+        ensure_folder_exists(current_app.config['DETECTION_IMAGES_FOLDER'])
+
         try:
             # Proses video dan dapatkan frame untuk email
-            email_frame_path = process_video(input_path, output_path, current_user.id, save_for_email=True)
-            logging.info(f"Video berhasil diproses. Frame email disimpan di: {email_frame_path}")
-            
+            email_frame_path = process_video(
+                input_path, output_path, current_user.id, save_for_email=True
+            )
+            if not email_frame_path:
+                raise ValueError("Frame for email was not generated.")
+            logging.info(
+                f"Video berhasil diproses. Frame email disimpan di: {email_frame_path}"
+            )
+
             # Ambil deteksi dengan confidence tertinggi
             connection = get_db()
             cursor = connection.cursor()
@@ -403,7 +363,7 @@ def detect_upload():
             cursor.close()
 
             # Kirim notifikasi jika terdeteksi jatuh
-            if highest_confidence_fall and email_frame_path:
+            if highest_confidence_fall:
                 highest_fall_data = {
                     'time': highest_confidence_fall[0],
                     'confidence': highest_confidence_fall[1],
@@ -411,7 +371,7 @@ def detect_upload():
                 }
                 send_fall_report(
                     email=current_user.email,
-                    phone=current_user.phone, 
+                    phone=current_user.phone,
                     fall_data=highest_fall_data,
                     name=current_user.name
                 )
@@ -422,8 +382,7 @@ def detect_upload():
             logging.info(f"URL video output: {video_url}")
 
             flash('Video berhasil diproses. Silakan unduh hasilnya.', 'success')
-            return render_template('home/detect_upload.html', 
-                                output_path=video_url)
+            return render_template('home/detect_upload.html', output_path=video_url)
 
         except Exception as e:
             logging.error(f"Error saat memproses video: {str(e)}")
@@ -438,16 +397,44 @@ def detect_upload():
 def serve_detection_video(filename):
     """Serve processed video files"""
     try:
-        detection_path = current_app.config['DETECTION_IMAGES_FOLDER']
-        return send_from_directory(
-            detection_path,
-            filename,
-            mimetype='video/mp4',
-            as_attachment=False
-        )
+        detection_path = os.path.abspath(
+            current_app.config['DETECTION_IMAGES_FOLDER'])
+
+        # Handle both .mp4 and .avi extensions
+        base_filename = filename.rsplit('.', 1)[0]
+        possible_files = [
+            f"{base_filename}.avi",
+            f"{base_filename}.mp4"
+        ]
+
+        for possible_file in possible_files:
+            full_path = os.path.join(detection_path, possible_file)
+            if os.path.exists(full_path):
+                logging.info(f"Found video file at: {full_path}")
+
+                # Set correct MIME type based on extension
+                if possible_file.endswith('.mp4'):
+                    mimetype = 'video/mp4'
+                elif possible_file.endswith('.avi'):
+                    mimetype = 'video/x-msvideo'
+
+                response = send_from_directory(
+                    detection_path,
+                    possible_file,
+                    mimetype=mimetype,
+                    as_attachment=False,
+                    conditional=True
+                )
+
+                response.headers['Accept-Ranges'] = 'bytes'
+                response.headers['Cache-Control'] = 'no-cache'
+                return response
+
+        raise FileNotFoundError(f"No video file found for {filename}")
+
     except Exception as e:
         logging.error(f"Error serving video: {str(e)}")
-        return "Video not found", 404
+        return f"Error serving video: {str(e)}", 404
 
 @main_bp.route('/detect/realtime_rtsp', methods=['POST'])
 @login_required
@@ -464,82 +451,76 @@ def detect_realtime_rtsp():
         'home/detect_upload.html',
         rtsp_url=rtsp_url
     )
-    
+
 def send_fall_report(email, phone, fall_data, name):
     """
     Mengirimkan laporan deteksi jatuh melalui email dan WhatsApp (jika nomor telepon tersedia).
     """
-    # Kirim laporan melalui email
-    html_content = render_template(
-        'email_templates/fall_report_email.html',
-        name=name,
-        time=fall_data['time'],
-        confidence=fall_data['confidence'],
-        image_url=current_app.config['PUBLIC_URL'] + url_for('static', filename=fall_data['image_path'])
-    )
-    message = Mail(
-        from_email=current_app.config['SENDGRID_DEFAULT_FROM'],
-        to_emails=email,
-        subject='Laporan Deteksi Jatuh',
-        html_content=html_content
-    )
     try:
+        # Kirim laporan melalui email
+        html_content = render_template(
+            'email_templates/fall_report_email.html',
+            name=name,
+            time=fall_data['time'],
+            confidence=fall_data['confidence'],
+            image_url=url_for('static', filename=fall_data['image_path'], _external=True)
+        )
+        message = Mail(
+            from_email=current_app.config['SENDGRID_DEFAULT_FROM'],
+            to_emails=email,
+            subject='Laporan Deteksi Jatuh',
+            html_content=html_content
+        )
+
         sg = SendGridAPIClient(current_app.config['SENDGRID_API_KEY'])
         response = sg.send(message)
-        logging.info(f"Email sent to {email} with status code {response.status_code}")
-    except Exception as e:
-        logging.error(f"Error sending email to {email}: {e}")
+        logging.info(
+            f"Email sent to {email} with status code {response.status_code}")
 
-    # Kirim laporan melalui WhatsApp jika nomor telepon tersedia
-    if phone:
-        try:
+        # Kirim laporan melalui WhatsApp jika nomor telepon tersedia
+        if phone:
             send_fall_report_whatsapp(phone, fall_data, name)
-        except Exception as e:
-            logging.error(f"Error sending WhatsApp message to {phone}: {e}")
-
+    except Exception as e:
+        logging.error(f"Error sending report: {str(e)}")
 
 def send_fall_report_whatsapp(phone, fall_data, name):
     """
     Mengirimkan laporan deteksi jatuh melalui WhatsApp menggunakan WAPISender.
     """
-    if not phone:
-        logging.info("No phone number provided. Skipping WhatsApp notification.")
-        return  # Gak kirim kalau nomor telepon tidak tersedia
-
-    api_url = "https://wapisender.id/api/v5/message/image"
-    api_key = current_app.config['WAPISENDER_API_KEY']
-    device_key = current_app.config['WAPISENDER_DEVICE_KEY']
-
-    # Validasi file gambar
-    image_path = fall_data.get('image_path')
-    if not os.path.exists(image_path):
-        logging.error(f"File not found: {image_path}")
-        return
-
-    # Payload data
-    payload = {
-        'api_key': api_key,
-        'device_key': device_key,
-        'destination': phone,
-        'caption': (
-            f"Halo, {name}!\n\n"
-            f"Kami mendeteksi adanya *Jatuh* pada sesi pendeteksian terakhir.\n\n"
-            f"Detail deteksi:\n"
-            f"- Waktu: {fall_data['time']}\n"
-            f"- Confidence: {fall_data['confidence']}%\n\n"
-            f"Berikut adalah gambar deteksinya:"
-        ),
-        'view_once': 'false'
-    }
-
-    # Coba kirim gambar
     try:
-        with open(image_path, 'rb') as image_file:
-            files = {'image': (os.path.basename(image_path), image_file, 'image/jpeg')}
+        api_url = current_app.config['WAPISENDER_API_URL']
+        api_key = current_app.config['WAPISENDER_API_KEY']
+        device_key = current_app.config['WAPISENDER_DEVICE_KEY']
+
+        # Validasi file gambar
+        abs_image_path = os.path.join(current_app.root_path, 'static', fall_data['image_path'])
+        logging.info(f"Checking image at: {abs_image_path}")
+
+        if not os.path.exists(abs_image_path):
+            logging.error(f"File not found: {abs_image_path}")
+            return
+
+        # Payload data
+        payload = {
+            'api_key': api_key,
+            'device_key': device_key,
+            'destination': phone,
+            'caption': (
+                f"Halo, {name}!\n\n"
+                f"Kami mendeteksi adanya *Jatuh* pada sesi pendeteksian terakhir.\n\n"
+                f"Detail deteksi:\n"
+                f"- Waktu: {fall_data['time']}\n"
+                f"- Confidence: {fall_data['confidence']}%\n\n"
+                f"Berikut adalah gambar deteksinya:"
+            ),
+            'view_once': 'false'
+        }
+
+        with open(abs_image_path, 'rb') as image_file:
+            files = {'image': (os.path.basename(abs_image_path), image_file, 'image/jpeg')}
             response = requests.post(api_url, data=payload, files=files)
             response.raise_for_status()
             logging.info(f"WhatsApp message sent to {phone}: {response.json()}")
-    except FileNotFoundError:
-        logging.error(f"File not found during WhatsApp sending: {image_path}")
+
     except Exception as e:
         logging.error(f"Failed to send WhatsApp message to {phone}: {e}")
