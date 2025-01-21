@@ -1,24 +1,31 @@
+import logging
 import mysql.connector
 from flask import g
 from config import Config
 
+logging.basicConfig(level=logging.DEBUG)
+
 def connect_db():
-    # Bikin koneksi ke database MySQL
-    return mysql.connector.connect(
-        host=Config.DB_HOST,
-        user=Config.DB_USER,
-        password=Config.DB_PASSWORD,
-        database=Config.DB_NAME
-    )
+    try:
+        db_connection = mysql.connector.connect(
+            host=Config.DB_HOST,
+            port=Config.DB_PORT,
+            user=Config.DB_USER,
+            password=Config.DB_PASSWORD,
+            database=Config.DB_NAME
+        )
+        logging.debug("Database connection established.")
+        return db_connection
+    except mysql.connector.Error as err:
+        logging.error(f"Error connecting to the database: {err}")
+        raise
 
 def get_db():
-    # Ambil koneksi database, kalau belum ada, bikin baru
     if 'db' not in g:
         g.db = connect_db()
     return g.db
 
 def close_db(e=None):
-    # Tutup koneksi database pas request selesai
     db = g.pop('db', None)
     if db is not None:
         db.close()

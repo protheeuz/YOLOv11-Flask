@@ -1,5 +1,9 @@
 import os
+import logging
 from dotenv import load_dotenv
+
+
+logging.basicConfig(level=logging.DEBUG)
 
 # Load variabel lingkungan dari file .env
 load_dotenv()
@@ -7,8 +11,10 @@ load_dotenv()
 class Config:
     SECRET_KEY = os.getenv('SECRET_KEY') or '5f957e6105f189f9974ae631b351b321'
     
+    
     # Database Configuration
     DB_HOST = os.getenv('DB_HOST')
+    DB_PORT = os.getenv('DB_PORT', '3306')
     DB_USER = os.getenv('DB_USER')
     DB_PASSWORD = os.getenv('DB_PASSWORD')
     DB_NAME = os.getenv('DB_NAME')

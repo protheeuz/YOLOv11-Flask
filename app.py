@@ -23,7 +23,9 @@ from views.main import main_bp
 from models import User
 
 # Load variabel lingkungan dari file .env
-load_dotenv()
+from dotenv import load_dotenv
+load_dotenv() 
+
 
 app = Flask(__name__)
 app.config.from_object(Config)
