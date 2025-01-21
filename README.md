@@ -3,6 +3,6 @@ Object Detection Web App using YOLOv11 and Flask. Supports RTSP Streams and Vide
 --------------------------------------------------------------------
 
 ## Features
-** 1. User Authentication**
+**1. User Authentication**
 + Secure login and registration functionality using Flask-Login.
 + Supports session management for user access.
