@@ -314,8 +314,8 @@ def process_video(input_path, output_path, user_id, save_for_email=False):
 
         while cap.isOpened():
             ret, frame = cap.read()
-            if not ret:
-                logging.info(f"Original frame shape: {frame.shape}")
+            if not ret or frame is None:
+                logging.error("Failed to read frame or frame is None")
                 break
 
             frame_count += 1
