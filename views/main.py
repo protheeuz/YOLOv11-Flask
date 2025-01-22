@@ -321,8 +321,13 @@ def detect_upload():
             flash('Harap unggah file video.', 'danger')
             return redirect(url_for('main.detect_upload'))
 
-        # Simpan file video input
+        # Validasi ekstensi file
         filename = secure_filename(video_file.filename)
+        if not filename.lower().endswith('.mp4'):
+            flash('Hanya file dengan format .mp4 yang didukung.', 'danger')
+            return redirect(url_for('main.detect_upload'))
+
+        # Simpan file video input
         input_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
         ensure_folder_exists(current_app.config['UPLOAD_FOLDER'])
         video_file.save(input_path)
@@ -330,9 +335,6 @@ def detect_upload():
 
         # Konfigurasi path untuk output
         output_filename = f"output_{filename}"
-        if not output_filename.lower().endswith(('.avi', '.mp4')):
-            output_filename += '.avi'
-
         output_path = os.path.join(
             current_app.config['DETECTION_IMAGES_FOLDER'], output_filename
         )
@@ -344,7 +346,7 @@ def detect_upload():
                 input_path, output_path, current_user.id, save_for_email=True
             )
             if not email_frame_path:
-                raise ValueError("Frame for email was not generated.")
+                raise ValueError("Frame untuk email tidak berhasil dibuat.")
             logging.info(
                 f"Video berhasil diproses. Frame email disimpan di: {email_frame_path}"
             )
@@ -395,28 +397,25 @@ def detect_upload():
 @main_bp.route('/detections/<filename>')
 @login_required
 def serve_detection_video(filename):
-    """Serve processed video files"""
+    """Serve processed video files."""
     try:
-        detection_path = os.path.abspath(
-            current_app.config['DETECTION_IMAGES_FOLDER'])
-
-        # Handle both .mp4 and .avi extensions
+        detection_path = os.path.abspath(current_app.config['DETECTION_IMAGES_FOLDER'])
         base_filename = filename.rsplit('.', 1)[0]
         possible_files = [
             f"{base_filename}.avi",
             f"{base_filename}.mp4"
         ]
 
+        mimetype_map = {
+            '.mp4': 'video/mp4',
+            '.avi': 'video/x-msvideo'
+        }
+
         for possible_file in possible_files:
             full_path = os.path.join(detection_path, possible_file)
             if os.path.exists(full_path):
-                logging.info(f"Found video file at: {full_path}")
-
-                # Set correct MIME type based on extension
-                if possible_file.endswith('.mp4'):
-                    mimetype = 'video/mp4'
-                elif possible_file.endswith('.avi'):
-                    mimetype = 'video/x-msvideo'
+                file_ext = os.path.splitext(possible_file)[-1].lower()
+                mimetype = mimetype_map.get(file_ext, 'application/octet-stream')
 
                 response = send_from_directory(
                     detection_path,

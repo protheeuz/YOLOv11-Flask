@@ -26,7 +26,6 @@ from models import User
 from dotenv import load_dotenv
 load_dotenv() 
 
-
 app = Flask(__name__)
 app.config.from_object(Config)
 app.secret_key = '5f957e6105f189f9974ae631b351b321'
