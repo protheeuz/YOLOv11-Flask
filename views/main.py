@@ -310,46 +310,98 @@ def ensure_folder_exists(folder_path):
     except Exception as e:
         logging.error(f"Failed to create folder {folder_path}: {e}")
         raise
+    
+def resize_video(input_path, output_path, scale_factor=0.5):
+    """Meresize video untuk mempercepat proses inferensi."""
+    cap = cv2.VideoCapture(input_path)
+    if not cap.isOpened():
+        raise ValueError(f"Tidak dapat membuka video input: {input_path}")
+    
+    original_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    original_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    
+    # Hitung dimensi baru
+    new_width = int(original_width * scale_factor)
+    new_height = int(original_height * scale_factor)
+    
+    # Pastikan dimensi genap untuk codec video
+    new_width = new_width - (new_width % 2)
+    new_height = new_height - (new_height % 2)
+    
+    # Inisialisasi VideoWriter
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (new_width, new_height))
+    
+    try:
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+            resized_frame = cv2.resize(frame, (new_width, new_height))
+            out.write(resized_frame)
+    finally:
+        cap.release()
+        out.release()
 
 @main_bp.route('/detect/upload', methods=['GET', 'POST'])
 @login_required
 def detect_upload():
     if request.method == 'POST':
-        # Validasi file video
         video_file = request.files.get('video')
         if not video_file:
             flash('Harap unggah file video.', 'danger')
             return redirect(url_for('main.detect_upload'))
 
-        # Validasi ekstensi file
         filename = secure_filename(video_file.filename)
         if not filename.lower().endswith('.mp4'):
             flash('Hanya file dengan format .mp4 yang didukung.', 'danger')
             return redirect(url_for('main.detect_upload'))
 
-        # Simpan file video input
-        input_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+        # Simpan video original
+        original_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
         ensure_folder_exists(current_app.config['UPLOAD_FOLDER'])
-        video_file.save(input_path)
-        logging.info(f"Video input disimpan di: {input_path}")
-
-        # Konfigurasi path untuk output
-        output_filename = f"output_{filename}"
-        output_path = os.path.join(
-            current_app.config['DETECTION_IMAGES_FOLDER'], output_filename
-        )
-        ensure_folder_exists(current_app.config['DETECTION_IMAGES_FOLDER'])
-
+        video_file.save(original_path)
+        
+        # Resize video untuk optimasi
+        resized_filename = f"resized_{filename}"
+        resized_path = os.path.join(current_app.config['UPLOAD_FOLDER'], resized_filename)
+        
         try:
-            # Proses video dan dapatkan frame untuk email
+            # Resize video ke 50% resolusi asli
+            resize_video(original_path, resized_path, scale_factor=0.5)
+            logging.info(f"Video diresize dan disimpan di: {resized_path}")
+            
+            # Gunakan video yang sudah diresize untuk processing
+            input_path = resized_path
+            
+            # Konfigurasi output
+            output_filename = f"output_{filename}"
+            output_path = os.path.join(
+                current_app.config['DETECTION_IMAGES_FOLDER'], 
+                output_filename
+            )
+            ensure_folder_exists(current_app.config['DETECTION_IMAGES_FOLDER'])
+
+            # Proses video dengan ThreadPool untuk paralelisasi frame
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                email_frame_path = executor.submit(
+                    process_video, 
+                    input_path, 
+                    output_path, 
+                    current_user.id, 
+                    True
+                ).result()
+                
             email_frame_path = process_video(
                 input_path, output_path, current_user.id, save_for_email=True
             )
             if not email_frame_path:
-                raise ValueError("Frame untuk email tidak berhasil dibuat.")
-            logging.info(
-                f"Video berhasil diproses. Frame email disimpan di: {email_frame_path}"
-            )
+                raise ValueError("Frame untuk email gagal dibuat.")
+
+            # Hapus video original dan resized setelah diproses
+            os.remove(original_path)
+            os.remove(resized_path)
 
             # Ambil deteksi dengan confidence tertinggi
             connection = get_db()
@@ -381,8 +433,6 @@ def detect_upload():
 
             # Generate URL untuk video output menggunakan route khusus
             video_url = url_for('main.serve_detection_video', filename=output_filename)
-            logging.info(f"URL video output: {video_url}")
-
             flash('Video berhasil diproses. Silakan unduh hasilnya.', 'success')
             return render_template('home/detect_upload.html', output_path=video_url)
 
