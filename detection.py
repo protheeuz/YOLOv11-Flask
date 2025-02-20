@@ -281,10 +281,9 @@ def detect_and_label(frame, user_id):
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
     return frame
 
-
 def process_video(input_path, output_path, user_id, save_for_email=False):
     """
-    Memproses video untuk mendeteksi dan menyimpan hasil.
+    Memproses video untuk mendeteksi dan menyimpan hasil HANYA dengan confidence tertinggi untuk label "Jatuh".
     """
     try:
         cap = cv2.VideoCapture(input_path)
@@ -292,105 +291,115 @@ def process_video(input_path, output_path, user_id, save_for_email=False):
             raise ValueError(f"Cannot open input video: {input_path}")
 
         fps = int(cap.get(cv2.CAP_PROP_FPS))
-        if fps <= 0:
-            fps = 25
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        output_path = output_path.replace('\\', '/')
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-        if os.path.exists(output_path):
-            os.remove(output_path)
-
+        # Setup output video
         fourcc = cv2.VideoWriter_fourcc(*'avc1')
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-        if not out.isOpened():
-            raise ValueError(f"Cannot create output video: {output_path}")
+
+        # Variabel tracking untuk deteksi terbaik
+        best_detection = {
+            'confidence': 0.0,
+            'cropped_path': None,
+            'bbox_path': None,
+            'timestamp': None,
+            'frame_number': 0
+        }
+
+        detection_folder = os.path.abspath(current_app.config['DETECTION_IMAGES_FOLDER'])
+        os.makedirs(detection_folder, exist_ok=True)
 
         frame_count = 0
-        highest_confidence = 0.0
-        email_frame_path = None
+        fall_detected = False
 
         while cap.isOpened():
             ret, frame = cap.read()
-            if not ret or frame is None:
-                logging.error("Failed to read frame or frame is None")
+            if not ret:
                 break
 
             frame_count += 1
-            try:
-                results = model(frame)
-                for result in results:
-                    if hasattr(result, "boxes"):
-                        for box in result.boxes:
+            current_frame_best = {'confidence': 0.0, 'coords': None}
+            
+            # Proses deteksi dan gambar bounding box untuk SEMUA deteksi
+            results = model(frame)
+            for result in results:
+                if hasattr(result, "boxes"):
+                    for box in result.boxes:
+                        confidence = box.conf[0].item()
+                        class_id = int(box.cls[0].item())
+                        label = LABEL_MAP.get(class_id, "Unknown")
+                        
+                        # Gambar bounding box untuk SEMUA deteksi valid
+                        if confidence >= CONFIDENCE_THRESHOLD:
                             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-                            confidence = box.conf[0].item()
-                            class_id = int(box.cls[0].item())
+                            color = (0, 255, 0)  # Hijau untuk label selain "Jatuh"
+                            if label == "Jatuh":
+                                color = (0, 0, 255)  # Merah untuk "Jatuh"
+                            
+                            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                            cv2.putText(frame, f"{label} ({confidence:.2f})", 
+                                       (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 
+                                       0.5, color, 2)
+                            
+                            # Update deteksi terbaik dalam frame ini untuk "Jatuh"
+                            if label == "Jatuh" and confidence > current_frame_best['confidence']:
+                                current_frame_best = {
+                                    'confidence': confidence,
+                                    'coords': (x1, y1, x2, y2)
+                                }
 
-                            if confidence <= CONFIDENCE_THRESHOLD:
-                                continue
+            # Tulis frame dengan SEMUA bounding box ke output video
+            out.write(frame)
 
-                            label = LABEL_MAP.get(
-                                class_id, f"Unknown-{class_id}")
-                            cv2.rectangle(frame, (x1, y1),
-                                          (x2, y2), (0, 255, 0), 2)
-                            cv2.putText(frame, f"{label} ({confidence:.2f})",
-                                        (x1, y1 - 10),
-                                        cv2.FONT_HERSHEY_SIMPLEX,
-                                        0.5,
-                                        (0, 255, 0),
-                                        2)
+            # Update deteksi terbaik global untuk "Jatuh"
+            if current_frame_best['confidence'] > best_detection['confidence']:
+                # Hapus file lama jika ada
+                if best_detection['cropped_path']:
+                    try:
+                        os.remove(os.path.join(detection_folder, os.path.basename(best_detection['cropped_path'])))
+                        os.remove(os.path.join(detection_folder, os.path.basename(best_detection['bbox_path'])))
+                    except Exception as e:
+                        logging.error(f"Error deleting old files: {str(e)}")
 
-                            if label.lower() == "jatuh":
-                                try:
-                                    timestamp = int(time.time())
-                                    detection_folder = os.path.abspath(
-                                        current_app.config['DETECTION_IMAGES_FOLDER'])
-                                    os.makedirs(detection_folder,
-                                                exist_ok=True)
-
-                                    cropped_filename = f"fall_{user_id}_{timestamp}_{frame_count}.jpg"
-                                    bbox_filename = f"fall_{user_id}_{timestamp}_{frame_count}_bbox.jpg"
-
-                                    cropped_abs_path = os.path.join(
-                                        detection_folder, cropped_filename)
-                                    bbox_abs_path = os.path.join(
-                                        detection_folder, bbox_filename)
-
-                                    cropped_image = frame[y1:y2, x1:x2]
-                                    cv2.imwrite(cropped_abs_path,
-                                                cropped_image)
-
-                                    if confidence > highest_confidence and save_for_email:
-                                        highest_confidence = confidence
-                                        cv2.imwrite(bbox_abs_path, frame)
-                                        email_frame_path = f"uploads/detections/{bbox_filename}"
-                                        print(
-                                            f"Saved bbox image to: {bbox_abs_path}")
-
-                                    rel_path = f"uploads/detections/{cropped_filename}"
-                                    save_detection_to_db(
-                                        user_id, label, confidence, rel_path)
-
-                                except Exception as save_error:
-                                    print(
-                                        f"Error saving detection images: {str(save_error)}")
-                                    print(
-                                        f"Current working directory: {os.getcwd()}")
-
-                out.write(frame)
-
-            except Exception as e:
-                print(f"Error on frame {frame_count}: {str(e)}")
-                continue
+                # Simpan deteksi baru untuk "Jatuh" dengan confidence tertinggi
+                timestamp = int(time.time())
+                x1, y1, x2, y2 = current_frame_best['coords']
+                
+                # Generate nama file
+                cropped_filename = f"fall_{user_id}_{timestamp}_{frame_count}_crop.jpg"
+                bbox_filename = f"fall_{user_id}_{timestamp}_{frame_count}_bbox.jpg"
+                
+                # Simpan gambar
+                cv2.imwrite(os.path.join(detection_folder, cropped_filename), frame[y1:y2, x1:x2])
+                cv2.imwrite(os.path.join(detection_folder, bbox_filename), frame)
+                
+                # Update best detection
+                best_detection.update({
+                    'confidence': current_frame_best['confidence'],
+                    'cropped_path': f"uploads/detections/{cropped_filename}",
+                    'bbox_path': f"uploads/detections/{bbox_filename}",
+                    'timestamp': timestamp,
+                    'frame_number': frame_count
+                })
+                
+                fall_detected = True
 
         cap.release()
         out.release()
 
-        print(f"Video processing completed: {output_path}")
-        return email_frame_path
+        # Simpan ke database jika ada deteksi valid
+        if fall_detected:
+            save_detection_to_db(
+                user_id=user_id,
+                label="Jatuh",
+                confidence=best_detection['confidence'],
+                image_path=best_detection['cropped_path']
+            )
+            return best_detection['bbox_path']
+
+        return None
 
     except Exception as e:
-        print(f"Fatal error during video processing: {str(e)}")
+        logging.error(f"Error processing video: {str(e)}")
         raise
