@@ -83,12 +83,12 @@ class RTSPStreamHandler:
                     continue
                 logging.info(f"Processing frame with shape: {frame.shape}")
 
-                # Konsistensi ukuran frame
-                target_height = 256  # Sesuaikan dengan detect_upload
+                # Konsistensi ukuran frame (sesuaikan dengan yang ada di process_video)
+                target_height = 256  # Sesuaikan dengan target height di process_video
                 target_width = int(frame.shape[1] * target_height / frame.shape[0])
                 resized_frame = cv2.resize(frame, (target_width, target_height))
 
-                # Proses deteksi dengan model
+                # Proses deteksi dengan model YOLO
                 results = self.model(resized_frame)
                 processed_frame = frame.copy()
 

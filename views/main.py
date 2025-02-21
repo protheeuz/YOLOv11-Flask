@@ -3,6 +3,7 @@ import time
 import cv2
 import logging
 import requests
+import base64
 from flask import Blueprint, Response, flash, g, render_template, redirect, send_from_directory, url_for, request, jsonify, current_app
 from flask_login import login_required, current_user, login_user
 from database import get_db
@@ -12,7 +13,7 @@ from detection import LABEL_MAP, RTSPStreamHandler, detect_and_label, generate_f
 from werkzeug.utils import secure_filename
 from datetime import date, timedelta
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+from sendgrid.helpers.mail import Mail, Header, Attachment, Content, FileContent, FileName, FileType, Disposition
 
 main_bp = Blueprint('main', __name__)
 
@@ -436,6 +437,22 @@ def serve_detection_video(filename):
         logging.error(f"Error serving video: {str(e)}")
         return f"Error serving video: {str(e)}", 404
 
+# @main_bp.route('/detect/realtime_rtsp', methods=['POST'])
+# @login_required
+# def detect_realtime_rtsp():
+#     """
+#     Proses deteksi real-time dengan RTSP.
+#     """
+#     rtsp_url = request.form.get('rtsp_url')
+#     if not rtsp_url:
+#         flash("URL RTSP diperlukan untuk memulai deteksi real-time.", "danger")
+#         return redirect(url_for('main.detect_upload'))
+
+#     return render_template(
+#         'home/detect_upload.html',
+#         rtsp_url=rtsp_url
+#     )
+
 @main_bp.route('/detect/realtime_rtsp', methods=['POST'])
 @login_required
 def detect_realtime_rtsp():
@@ -447,24 +464,48 @@ def detect_realtime_rtsp():
         flash("URL RTSP diperlukan untuk memulai deteksi real-time.", "danger")
         return redirect(url_for('main.detect_upload'))
 
+    handler = get_stream_handler(rtsp_url, model)
+
+    handler.start()
+
     return render_template(
         'home/detect_upload.html',
-        rtsp_url=rtsp_url
+        rtsp_url=rtsp_url,
+        stream_url=url_for('main.stream', video_source=rtsp_url, _external=True)
     )
+
 
 def send_fall_report(email, phone, fall_data, name):
     """
     Mengirimkan laporan deteksi jatuh melalui email dan WhatsApp (jika nomor telepon tersedia).
     """
     try:
-        # Kirim laporan melalui email
+        # Lokasi gambar
+        abs_image_path = os.path.join(current_app.root_path, 'static', fall_data['image_path'])
+
+        # Membaca gambar sebagai attachment
+        with open(abs_image_path, 'rb') as f:
+            img_data = f.read()
+
+        # Mengonversi gambar menjadi string base64
+        encoded_img_data = base64.b64encode(img_data).decode('utf-8')
+
+        # Membuat attachment dengan Content-ID untuk inline image
+        attachment = Attachment()
+        attachment.file_content = FileContent(encoded_img_data)  # Menggunakan data base64
+        attachment.file_type = FileType("image/jpeg")
+        attachment.file_name = FileName("fall_image.jpg")
+        attachment.disposition = Disposition("inline")
+        attachment.content_id = "fall_image" 
+
         html_content = render_template(
             'email_templates/fall_report_email.html',
             name=name,
             time=fall_data['time'],
             confidence=fall_data['confidence'],
-            image_url=url_for('static', filename=fall_data['image_path'], _external=True)
+            image_cid="cid:fall_image" 
         )
+
         message = Mail(
             from_email=current_app.config['SENDGRID_DEFAULT_FROM'],
             to_emails=email,
@@ -472,6 +513,9 @@ def send_fall_report(email, phone, fall_data, name):
             html_content=html_content
         )
 
+        message.attachment = attachment
+
+        # Kirim email menggunakan SendGrid API
         sg = SendGridAPIClient(current_app.config['SENDGRID_API_KEY'])
         response = sg.send(message)
         logging.info(
