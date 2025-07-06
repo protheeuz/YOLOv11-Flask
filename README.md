@@ -25,14 +25,19 @@ Object Detection Web App using YOLOv11 and Flask. Supports RTSP Streams and Vide
 ## Installation
 **1. Clone the repository:**
 ```git clone https://github.com/protheeuz/YOLOv11-Flask.git```
+
 **2. Install dependencies:**
 ```pip install -r requirements.txt```
+
 **3. Create and configure a .env file:**
 + Define environment variables such as database credentials, Flask secret key, and other required settings.
+
 **4. Initialize the database:**
 + Execute the necessary SQL scripts or ORM migrations to set up the database schema.
+
 **5. Run the application:**
 ```python app.py```
+
 **6. Access the web app:**
 + Open your browser and navigate to ``http://localhost:PORT``.
 
@@ -75,9 +80,12 @@ A background thread is implemented to periodically clean up old detection files.
 ## Usage
 **1. Login:**
 + Create an account or log in using your credentials.
+
 **2. Upload Video:**
 + Navigate to the upload page and upload a video file.
+
 **3. Real-Time Detection:**
 + Monitor object detection output directly on the application.
+
 **4. RTSP Stream Monitoring:**
 + Add RTSP stream URLs for live monitoring and fall detection.
