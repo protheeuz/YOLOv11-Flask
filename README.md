@@ -6,15 +6,19 @@ Object Detection Web App using YOLOv11 and Flask. Supports RTSP Streams and Vide
 **1. User Authentication:**
 + Secure login and registration functionality using Flask-Login.
 + Supports session management for user access.
+
 **2. Object Detection:**
 + Utilitizes YOLOv11 for *real-time object detection*.
-+ Allows video uploads for processing
-+ Provides RTSP stream integration for live detection
++ Allows video uploads for processing.
++ Provides RTSP stream integration for live detection.
+
 **3. File Management:**
 + Uploaded videos and detected frames are stored in a structured directory.
 + Automatically cleanup of old detection files to maintain storage efficiency.
+
 **4. Real-Time Notifications:**
 + Displays the count of new logins since the current day for authenticated users.
+
 **5. Cross-Origin Resource Sharing (CORS):**
 + Configured to allow specific resources to be accessed from external domains.
 
